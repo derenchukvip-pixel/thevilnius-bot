@@ -32,22 +32,30 @@ public class InstagramService {
     private final ObjectMapper mapper = new ObjectMapper();
 
     public void postImage(String caption) throws Exception {
-        String imageUrl = publicUrl.stripTrailing() + "/images/" + ImageService.OUTPUT_FILENAME;
-        log.info("Posting image from URL: {}", imageUrl);
+        String feedImageUrl = publicUrl.stripTrailing() + "/images/" + ImageService.OUTPUT_FILENAME;
+        log.info("Posting image from URL: {}", feedImageUrl);
 
-        String creationId = createMediaContainer(imageUrl, caption);
+        String creationId = createMediaContainer(feedImageUrl, caption);
         log.info("Media container created: {}", creationId);
 
         awaitContainerReady(creationId);
         publishMedia(creationId);
         log.info("Published to feed successfully");
 
-        // Story upload — failure is non-fatal
+        // Story upload with dedicated 9:16 image — failure is non-fatal
         try {
-            postStory(imageUrl);
+            String storyImageUrl = publicUrl.stripTrailing() + "/images/" + ImageService.STORY_FILENAME;
+            postStory(storyImageUrl);
         } catch (Exception e) {
             log.error("Story upload failed (non-fatal): {}", e.getMessage());
         }
+    }
+
+    public void postStoryOnly() throws Exception {
+        String storyImageUrl = publicUrl.stripTrailing() + "/images/" + ImageService.STORY_FILENAME;
+        log.info("Posting story-only from URL: {}", storyImageUrl);
+        postStory(storyImageUrl);
+        log.info("Story-only post done");
     }
 
     private void postStory(String imageUrl) throws Exception {

@@ -22,15 +22,19 @@ public class ImageService {
 
     private static final String STORAGE_DIR = "storage";
     public static final String OUTPUT_FILENAME = "upload.png";
+    public static final String STORY_FILENAME = "story_upload.png";
     private static final Path COUNTER_FILE = Paths.get(STORAGE_DIR, "theme_counter.txt");
 
     private enum Theme { LIGHT, DARK }
+
+    private Theme lastTheme = Theme.LIGHT;
 
     public Path generateImage(ArticleInfo article) throws Exception {
         Path storageDir = Paths.get(STORAGE_DIR);
         Files.createDirectories(storageDir);
 
         Theme theme = nextTheme();
+        lastTheme = theme;
         log.info("Using {} theme", theme);
 
         String title = article.getTitle() != null ? article.getTitle() : "";
@@ -68,6 +72,36 @@ public class ImageService {
         Files.writeString(COUNTER_FILE, String.valueOf((count + 1) % 6),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         return theme;
+    }
+
+    public Path generateStoryImage(ArticleInfo article) throws Exception {
+        Path storageDir = Paths.get(STORAGE_DIR);
+        Files.createDirectories(storageDir);
+
+        String title = article.getTitle() != null ? article.getTitle() : "";
+        String imageUrl = article.getImageUrl() != null ? article.getImageUrl() : "";
+        String html = lastTheme == Theme.DARK
+                ? buildDarkStoryHtml(title, imageUrl)
+                : buildLightStoryHtml(title, imageUrl);
+
+        Path outputPath = storageDir.resolve(STORY_FILENAME);
+
+        try (Playwright playwright = Playwright.create()) {
+            try (Browser browser = playwright.chromium().launch()) {
+                BrowserContext ctx = browser.newContext(
+                        new Browser.NewContextOptions().setViewportSize(1080, 1920));
+                Page page = ctx.newPage();
+                page.setContent(html);
+                page.waitForLoadState(LoadState.NETWORKIDLE,
+                        new Page.WaitForLoadStateOptions().setTimeout(10_000));
+                page.screenshot(new Page.ScreenshotOptions()
+                        .setPath(outputPath)
+                        .setType(ScreenshotType.PNG));
+            }
+        }
+
+        log.info("Story image saved: {} ({})", outputPath.toAbsolutePath(), lastTheme);
+        return outputPath;
     }
 
     // Escapes title and wraps the last 3 words in a yellow highlight span
@@ -162,6 +196,164 @@ public class ImageService {
                     <div class="title-wrap">
                       <div class="title">%s</div>
                     </div>
+                  </div>
+                  <div class="bottom"></div>
+                </body>
+                </html>
+                """.formatted(safeImage, buildTitleHtml(title));
+    }
+
+    private String buildDarkStoryHtml(String title, String imageUrl) {
+        String safeImage = imageUrl.replace("'", "\\'");
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                <meta charset="UTF-8">
+                <link rel="preconnect" href="https://fonts.googleapis.com">
+                <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;700&display=swap" rel="stylesheet">
+                <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body {
+                    width: 1080px; height: 1920px;
+                    overflow: hidden;
+                    display: flex; flex-direction: column;
+                  }
+
+                  /* top 60%% — text area; padding-top=280 pushes content below Instagram UI */
+                  .top {
+                    flex-shrink: 0;
+                    width: 1080px; height: 1152px;
+                    background: #111111;
+                    display: flex; flex-direction: column;
+                    padding: 280px 80px 60px;
+                  }
+
+                  .logo { display: inline-flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 40px; }
+                  .logo-the {
+                    font-family: 'League Spartan', sans-serif;
+                    font-weight: 700; font-size: 28px;
+                    color: rgba(255,255,255,0.9);
+                    text-transform: lowercase;
+                  }
+                  .logo-vilnius {
+                    font-family: 'League Spartan', sans-serif;
+                    font-weight: 700; font-size: 28px; letter-spacing: 2px;
+                    text-transform: uppercase;
+                    color: #111111; background: #FFD700;
+                    display: inline-block; padding: 4px 12px 6px; line-height: 1;
+                  }
+
+                  .title {
+                    font-family: 'League Spartan', sans-serif;
+                    font-weight: 700; font-size: 96px; line-height: 0.95;
+                    color: #ffffff;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 5; -webkit-box-orient: vertical;
+                    overflow: hidden;
+                  }
+                  .hl {
+                    background: #FFD700; color: #111111;
+                    padding: 4px 12px;
+                    border-radius: 3px;
+                    -webkit-box-decoration-break: clone;
+                    box-decoration-break: clone;
+                  }
+
+                  /* bottom 40%% — news photo; crisp edge, no blur */
+                  .bottom {
+                    flex: 1;
+                    background-image: url('%s');
+                    background-size: cover; background-position: center top;
+                    background-color: #1c1c1c;
+                  }
+                </style>
+                </head>
+                <body>
+                  <div class="top">
+                    <div class="logo">
+                      <span class="logo-the">the</span><span class="logo-vilnius">VILNIUS</span>
+                    </div>
+                    <div class="title">%s</div>
+                  </div>
+                  <div class="bottom"></div>
+                </body>
+                </html>
+                """.formatted(safeImage, buildTitleHtml(title));
+    }
+
+    private String buildLightStoryHtml(String title, String imageUrl) {
+        String safeImage = imageUrl.replace("'", "\\'");
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                <meta charset="UTF-8">
+                <link rel="preconnect" href="https://fonts.googleapis.com">
+                <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;700&display=swap" rel="stylesheet">
+                <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body {
+                    width: 1080px; height: 1920px;
+                    overflow: hidden;
+                    display: flex; flex-direction: column;
+                  }
+
+                  /* top 60%% — text area; padding-top=280 pushes content below Instagram UI */
+                  .top {
+                    flex-shrink: 0;
+                    width: 1080px; height: 1152px;
+                    background: #F4F0E6;
+                    display: flex; flex-direction: column;
+                    padding: 280px 80px 60px;
+                  }
+
+                  .logo { display: inline-flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 40px; }
+                  .logo-the {
+                    font-family: 'League Spartan', sans-serif;
+                    font-weight: 700; font-size: 28px;
+                    color: #111111;
+                    text-transform: lowercase;
+                  }
+                  .logo-vilnius {
+                    font-family: 'League Spartan', sans-serif;
+                    font-weight: 700; font-size: 28px; letter-spacing: 2px;
+                    text-transform: uppercase;
+                    color: #111111; background: #FFD700;
+                    display: inline-block; padding: 4px 12px 6px; line-height: 1;
+                  }
+
+                  .title {
+                    font-family: 'League Spartan', sans-serif;
+                    font-weight: 700; font-size: 96px; line-height: 0.95;
+                    color: #111111;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 5; -webkit-box-orient: vertical;
+                    overflow: hidden;
+                  }
+                  .hl {
+                    background: #FFD700; color: #111111;
+                    padding: 4px 12px;
+                    border-radius: 3px;
+                    -webkit-box-decoration-break: clone;
+                    box-decoration-break: clone;
+                  }
+
+                  /* bottom 40%% — news photo; crisp edge, no blur */
+                  .bottom {
+                    flex: 1;
+                    background-image: url('%s');
+                    background-size: cover; background-position: center top;
+                    background-color: #DDD9CE;
+                  }
+                </style>
+                </head>
+                <body>
+                  <div class="top">
+                    <div class="logo">
+                      <span class="logo-the">the</span><span class="logo-vilnius">VILNIUS</span>
+                    </div>
+                    <div class="title">%s</div>
                   </div>
                   <div class="bottom"></div>
                 </body>

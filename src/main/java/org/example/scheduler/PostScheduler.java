@@ -48,6 +48,7 @@ public class PostScheduler {
             }
 
             imageService.generateImage(article);
+            imageService.generateStoryImage(article);
             instagramService.postImage(captionService.formatCaption(article.getContent()));
             appendHistory(article.getLink());
 

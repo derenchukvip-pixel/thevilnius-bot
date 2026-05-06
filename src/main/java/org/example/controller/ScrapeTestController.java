@@ -36,8 +36,20 @@ public class ScrapeTestController {
         ArticleInfo article = scraperService.scrapeLatestArticle();
         if (article.getLink() == null) return "No article found";
         imageService.generateImage(article);
+        imageService.generateStoryImage(article);
         String caption = captionService.formatCaption(article.getContent());
         instagramService.postImage(caption);
         return "Force-posted: " + article.getTitle();
+    }
+
+    // Posts only a Story (9:16) — bypasses feed and duplicate check
+    @GetMapping("/test/force-story")
+    public String forceStory() throws Exception {
+        ArticleInfo article = scraperService.scrapeLatestArticle();
+        if (article.getLink() == null) return "No article found";
+        imageService.generateImage(article);
+        imageService.generateStoryImage(article);
+        instagramService.postStoryOnly();
+        return "Story posted: " + article.getTitle();
     }
 }
