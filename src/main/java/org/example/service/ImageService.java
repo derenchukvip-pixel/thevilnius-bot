@@ -107,7 +107,7 @@ public class ImageService {
                     width: 1080px; height: 540px;
                     background: #111111;
                     display: flex; flex-direction: column;
-                    padding: 50px 80px;
+                    padding: 50px 120px;
                   }
 
                   /* logo — single line: "the [VILNIUS]" */
@@ -191,7 +191,7 @@ public class ImageService {
                     width: 1080px; height: 540px;
                     background: #F4F0E6;
                     display: flex; flex-direction: column;
-                    padding: 50px 80px;
+                    padding: 50px 120px;
                   }
 
                   /* logo — single line: "the [VILNIUS]" */
