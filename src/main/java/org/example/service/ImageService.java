@@ -107,7 +107,7 @@ public class ImageService {
                     width: 1080px; height: 540px;
                     background: #111111;
                     display: flex; flex-direction: column;
-                    padding: 50px 120px;
+                    padding: 80px;
                   }
 
                   /* logo — single line: "the [VILNIUS]" */
@@ -131,7 +131,7 @@ public class ImageService {
                   .title {
                     width: 100%%;
                     font-family: 'League Spartan', sans-serif;
-                    font-weight: 700; font-size: 76px; line-height: 0.9;
+                    font-weight: 700; font-size: 72px; line-height: 1.1;
                     color: #ffffff;
                     display: -webkit-box;
                     -webkit-line-clamp: 4; -webkit-box-orient: vertical;
@@ -139,7 +139,8 @@ public class ImageService {
                   }
                   .hl {
                     background: #FFD700; color: #111111;
-                    padding: 0 10px;
+                    padding: 4px 10px;
+                    border-radius: 3px;
                     -webkit-box-decoration-break: clone;
                     box-decoration-break: clone;
                   }
@@ -191,7 +192,7 @@ public class ImageService {
                     width: 1080px; height: 540px;
                     background: #F4F0E6;
                     display: flex; flex-direction: column;
-                    padding: 50px 120px;
+                    padding: 80px;
                   }
 
                   /* logo — single line: "the [VILNIUS]" */
@@ -215,7 +216,7 @@ public class ImageService {
                   .title {
                     width: 100%%;
                     font-family: 'League Spartan', sans-serif;
-                    font-weight: 700; font-size: 76px; line-height: 0.9;
+                    font-weight: 700; font-size: 72px; line-height: 1.1;
                     color: #111111;
                     display: -webkit-box;
                     -webkit-line-clamp: 4; -webkit-box-orient: vertical;
@@ -223,7 +224,8 @@ public class ImageService {
                   }
                   .hl {
                     background: #FFD700; color: #111111;
-                    padding: 0 10px;
+                    padding: 4px 10px;
+                    border-radius: 3px;
                     -webkit-box-decoration-break: clone;
                     box-decoration-break: clone;
                   }
