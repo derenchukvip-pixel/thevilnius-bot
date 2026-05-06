@@ -3,6 +3,7 @@ package org.example.scheduler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.model.ArticleInfo;
+import org.example.service.CaptionService;
 import org.example.service.ImageService;
 import org.example.service.InstagramService;
 import org.example.service.ScraperService;
@@ -27,6 +28,7 @@ public class PostScheduler {
     private final ScraperService scraperService;
     private final ImageService imageService;
     private final InstagramService instagramService;
+    private final CaptionService captionService;
 
     @EventListener(ApplicationReadyEvent.class)
     public void run() {
@@ -46,24 +48,13 @@ public class PostScheduler {
             }
 
             imageService.generateImage(article);
-            instagramService.postImage(buildCaption(article));
+            instagramService.postImage(captionService.formatCaption(article.getContent()));
             appendHistory(article.getLink());
 
             log.info("Done: {}", article.getLink());
         } catch (Exception e) {
             log.error("Scheduled post failed", e);
         }
-    }
-
-    private String buildCaption(ArticleInfo article) {
-        String content = article.getContent() != null ? article.getContent() : "";
-        String link = article.getLink() != null ? article.getLink() : "";
-        String footer = "\n\n🔗 " + link;
-        int maxContent = 2200 - footer.length() - 5;
-        if (content.length() > maxContent) {
-            content = content.substring(0, maxContent) + "…";
-        }
-        return content + footer;
     }
 
     private boolean alreadyPosted(String link) throws Exception {

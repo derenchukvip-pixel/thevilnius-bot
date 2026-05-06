@@ -108,28 +108,27 @@ public class ImageService {
                     background: #111111;
                     display: flex; flex-direction: column;
                     justify-content: space-between;
-                    padding: 48px 56px 52px;
+                    padding: 50px;
                   }
 
-                  /* logo */
-                  .logo { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+                  /* logo — single line: "the [VILNIUS]" */
+                  .logo { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; }
                   .logo-the {
                     font-family: 'League Spartan', sans-serif;
-                    font-weight: 400;
-                    font-size: 13px; letter-spacing: 6px;
-                    color: rgba(255,255,255,0.42);
+                    font-weight: 700;
+                    font-size: 22px;
+                    color: rgba(255,255,255,0.9);
                     text-transform: lowercase;
-                    padding-left: 11px;
                   }
                   .logo-vilnius {
                     font-family: 'League Spartan', sans-serif;
                     font-weight: 700;
-                    font-size: 34px; letter-spacing: 4px;
+                    font-size: 22px; letter-spacing: 2px;
                     text-transform: uppercase;
                     color: #111111;
                     background: #FFD700;
                     display: inline-block;
-                    padding: 4px 11px 6px;
+                    padding: 3px 10px 5px;
                     line-height: 1;
                   }
 
@@ -137,7 +136,7 @@ public class ImageService {
                   .title {
                     font-family: 'League Spartan', sans-serif;
                     font-weight: 700;
-                    font-size: 76px; line-height: 0.95;
+                    font-size: 76px; line-height: 0.9;
                     color: #ffffff;
                     display: -webkit-box;
                     -webkit-line-clamp: 5; -webkit-box-orient: vertical;
@@ -162,8 +161,7 @@ public class ImageService {
                 <body>
                   <div class="top">
                     <div class="logo">
-                      <span class="logo-the">the</span>
-                      <span class="logo-vilnius">VILNIUS</span>
+                      <span class="logo-the">the</span><span class="logo-vilnius">VILNIUS</span>
                     </div>
                     <div class="title">%s</div>
                   </div>
@@ -197,28 +195,27 @@ public class ImageService {
                     background: #F4F0E6;
                     display: flex; flex-direction: column;
                     justify-content: space-between;
-                    padding: 48px 56px 52px;
+                    padding: 50px;
                   }
 
-                  /* logo */
-                  .logo { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+                  /* logo — single line: "the [VILNIUS]" */
+                  .logo { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; }
                   .logo-the {
                     font-family: 'League Spartan', sans-serif;
-                    font-weight: 400;
-                    font-size: 13px; letter-spacing: 6px;
-                    color: rgba(0,0,0,0.35);
+                    font-weight: 700;
+                    font-size: 22px;
+                    color: #111111;
                     text-transform: lowercase;
-                    padding-left: 11px;
                   }
                   .logo-vilnius {
                     font-family: 'League Spartan', sans-serif;
                     font-weight: 700;
-                    font-size: 34px; letter-spacing: 4px;
+                    font-size: 22px; letter-spacing: 2px;
                     text-transform: uppercase;
                     color: #111111;
                     background: #FFD700;
                     display: inline-block;
-                    padding: 4px 11px 6px;
+                    padding: 3px 10px 5px;
                     line-height: 1;
                   }
 
@@ -226,7 +223,7 @@ public class ImageService {
                   .title {
                     font-family: 'League Spartan', sans-serif;
                     font-weight: 700;
-                    font-size: 76px; line-height: 0.95;
+                    font-size: 76px; line-height: 0.9;
                     color: #111111;
                     display: -webkit-box;
                     -webkit-line-clamp: 5; -webkit-box-orient: vertical;
@@ -251,8 +248,7 @@ public class ImageService {
                 <body>
                   <div class="top">
                     <div class="logo">
-                      <span class="logo-the">the</span>
-                      <span class="logo-vilnius">VILNIUS</span>
+                      <span class="logo-the">the</span><span class="logo-vilnius">VILNIUS</span>
                     </div>
                     <div class="title">%s</div>
                   </div>
