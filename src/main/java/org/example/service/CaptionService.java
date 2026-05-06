@@ -25,17 +25,15 @@ public class CaptionService {
             Переформатируй текст новости в Instagram-подпись в стиле «The Warsaw».
 
             Стиль:
-            — В начале каждого абзаца ставь 1–2 релевантных эмодзи (🚨 ⚡️ 💬 🏛 💰 👮‍♂️ ⚖️ 🏙 📰 🔍 и другие по смыслу)
-            — Внутри текста добавляй эмодзи там, где они усиливают смысл
-            — Цитаты оформляй в «кавычках»
-            — Тон живой, вовлекающий, как будто рассказываешь другу новость
-            — Между абзацами — пустая строка (\\n\\n)
-            — Объём: не более 2000 символов
+            — В начале каждого абзаца ставь 1–2 релевантных эмодзи
+            — Тон живой, вовлекающий
+            — Между абзацами — пустая строка
+            — Объём: строго до 700 символов (это жёсткий лимит — Instagram скрывает текст после ~125 символов в ленте)
+            — Пиши кратко: 2–3 абзаца максимум, только самое главное
 
             Строго запрещено:
-            — Хэштеги (#...)
-            — Ссылки и URL
-            — Пометки «источник», «читать далее», «подробнее»
+            — Хэштеги, ссылки, URL
+            — Пометки «источник», «читать далее»
             — Любые пояснения от себя — только готовый caption
             """;
 
@@ -53,7 +51,7 @@ public class CaptionService {
             return result;
         } catch (Exception e) {
             log.error("Caption LLM call failed — falling back to raw content", e);
-            return rawContent.length() > 2200 ? rawContent.substring(0, 2200) + "…" : rawContent;
+            return rawContent.length() > 700 ? rawContent.substring(0, 700) + "…" : rawContent;
         }
     }
 
@@ -67,7 +65,7 @@ public class CaptionService {
         String userJson = mapper.writeValueAsString(content);
 
         String body = """
-                {"model":"%s","max_tokens":1500,"system":%s,"messages":[{"role":"user","content":%s}]}
+                {"model":"%s","max_tokens":500,"system":%s,"messages":[{"role":"user","content":%s}]}
                 """.formatted(MODEL, systemJson, userJson).strip();
 
         HttpRequest request = HttpRequest.newBuilder()

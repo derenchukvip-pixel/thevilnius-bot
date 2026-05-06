@@ -107,39 +107,34 @@ public class ImageService {
                     width: 1080px; height: 540px;
                     background: #111111;
                     display: flex; flex-direction: column;
-                    justify-content: space-between;
-                    padding: 50px;
+                    padding: 50px 80px;
                   }
 
                   /* logo — single line: "the [VILNIUS]" */
                   .logo { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; }
                   .logo-the {
                     font-family: 'League Spartan', sans-serif;
-                    font-weight: 700;
-                    font-size: 22px;
+                    font-weight: 700; font-size: 22px;
                     color: rgba(255,255,255,0.9);
                     text-transform: lowercase;
                   }
                   .logo-vilnius {
                     font-family: 'League Spartan', sans-serif;
-                    font-weight: 700;
-                    font-size: 22px; letter-spacing: 2px;
+                    font-weight: 700; font-size: 22px; letter-spacing: 2px;
                     text-transform: uppercase;
-                    color: #111111;
-                    background: #FFD700;
-                    display: inline-block;
-                    padding: 3px 10px 5px;
-                    line-height: 1;
+                    color: #111111; background: #FFD700;
+                    display: inline-block; padding: 3px 10px 5px; line-height: 1;
                   }
 
-                  /* title */
+                  /* title — vertically centered in remaining space */
+                  .title-wrap { flex: 1; display: flex; align-items: center; }
                   .title {
+                    width: 100%%;
                     font-family: 'League Spartan', sans-serif;
-                    font-weight: 700;
-                    font-size: 76px; line-height: 0.9;
+                    font-weight: 700; font-size: 76px; line-height: 0.9;
                     color: #ffffff;
                     display: -webkit-box;
-                    -webkit-line-clamp: 5; -webkit-box-orient: vertical;
+                    -webkit-line-clamp: 4; -webkit-box-orient: vertical;
                     overflow: hidden;
                   }
                   .hl {
@@ -163,7 +158,9 @@ public class ImageService {
                     <div class="logo">
                       <span class="logo-the">the</span><span class="logo-vilnius">VILNIUS</span>
                     </div>
-                    <div class="title">%s</div>
+                    <div class="title-wrap">
+                      <div class="title">%s</div>
+                    </div>
                   </div>
                   <div class="bottom"></div>
                 </body>
@@ -194,39 +191,34 @@ public class ImageService {
                     width: 1080px; height: 540px;
                     background: #F4F0E6;
                     display: flex; flex-direction: column;
-                    justify-content: space-between;
-                    padding: 50px;
+                    padding: 50px 80px;
                   }
 
                   /* logo — single line: "the [VILNIUS]" */
                   .logo { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; }
                   .logo-the {
                     font-family: 'League Spartan', sans-serif;
-                    font-weight: 700;
-                    font-size: 22px;
+                    font-weight: 700; font-size: 22px;
                     color: #111111;
                     text-transform: lowercase;
                   }
                   .logo-vilnius {
                     font-family: 'League Spartan', sans-serif;
-                    font-weight: 700;
-                    font-size: 22px; letter-spacing: 2px;
+                    font-weight: 700; font-size: 22px; letter-spacing: 2px;
                     text-transform: uppercase;
-                    color: #111111;
-                    background: #FFD700;
-                    display: inline-block;
-                    padding: 3px 10px 5px;
-                    line-height: 1;
+                    color: #111111; background: #FFD700;
+                    display: inline-block; padding: 3px 10px 5px; line-height: 1;
                   }
 
-                  /* title */
+                  /* title — vertically centered in remaining space */
+                  .title-wrap { flex: 1; display: flex; align-items: center; }
                   .title {
+                    width: 100%%;
                     font-family: 'League Spartan', sans-serif;
-                    font-weight: 700;
-                    font-size: 76px; line-height: 0.9;
+                    font-weight: 700; font-size: 76px; line-height: 0.9;
                     color: #111111;
                     display: -webkit-box;
-                    -webkit-line-clamp: 5; -webkit-box-orient: vertical;
+                    -webkit-line-clamp: 4; -webkit-box-orient: vertical;
                     overflow: hidden;
                   }
                   .hl {
@@ -250,7 +242,9 @@ public class ImageService {
                     <div class="logo">
                       <span class="logo-the">the</span><span class="logo-vilnius">VILNIUS</span>
                     </div>
-                    <div class="title">%s</div>
+                    <div class="title-wrap">
+                      <div class="title">%s</div>
+                    </div>
                   </div>
                   <div class="bottom"></div>
                 </body>

@@ -40,7 +40,37 @@ public class InstagramService {
 
         awaitContainerReady(creationId);
         publishMedia(creationId);
-        log.info("Published successfully");
+        log.info("Published to feed successfully");
+
+        // Story upload — failure is non-fatal
+        try {
+            postStory(imageUrl);
+        } catch (Exception e) {
+            log.error("Story upload failed (non-fatal): {}", e.getMessage());
+        }
+    }
+
+    private void postStory(String imageUrl) throws Exception {
+        log.info("Posting story...");
+        String body = "image_url=" + encode(imageUrl)
+                + "&media_type=STORIES"
+                + "&access_token=" + encode(accessToken);
+
+        HttpResponse<String> response = post(GRAPH_API + "/" + userId + "/media", body);
+        log.debug("Create story container response: {}", response.body());
+
+        JsonNode json = mapper.readTree(response.body());
+        requireField(json, "id", response.body());
+        String storyContainerId = json.get("id").asText();
+
+        awaitContainerReady(storyContainerId);
+
+        String publishBody = "creation_id=" + encode(storyContainerId)
+                + "&access_token=" + encode(accessToken);
+        HttpResponse<String> publishResponse = post(GRAPH_API + "/" + userId + "/media_publish", publishBody);
+        JsonNode publishJson = mapper.readTree(publishResponse.body());
+        requireField(publishJson, "id", publishResponse.body());
+        log.info("Story published successfully");
     }
 
     private String createMediaContainer(String imageUrl, String caption) throws Exception {
