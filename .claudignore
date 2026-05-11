@@ -1,0 +1,7 @@
+target/
+build/
+.git/
+.idea/
+logs/
+*.log
+storage/

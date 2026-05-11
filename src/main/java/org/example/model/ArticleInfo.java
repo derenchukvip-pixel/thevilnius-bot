@@ -8,4 +8,5 @@ public class ArticleInfo {
     private String imageUrl;
     private String link;
     private String content;
+    private String keyPhrase;
 }

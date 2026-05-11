@@ -6,6 +6,7 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.ScreenshotType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.model.ArticleInfo;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import java.util.Arrays;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class ImageService {
 
     private static final String STORAGE_DIR = "storage";
@@ -29,24 +31,31 @@ public class ImageService {
 
     private Theme lastTheme = Theme.LIGHT;
 
+    private final CaptionService captionService;
+
     public Path generateImage(ArticleInfo article) throws Exception {
         Path storageDir = Paths.get(STORAGE_DIR);
         Files.createDirectories(storageDir);
+
+        ensureKeyPhrase(article);
 
         Theme theme = nextTheme();
         lastTheme = theme;
         log.info("Using {} theme", theme);
 
-        String title = article.getTitle() != null ? article.getTitle() : "";
-        String imageUrl = article.getImageUrl() != null ? article.getImageUrl() : "";
-        String html = theme == Theme.DARK ? buildDarkHtml(title, imageUrl) : buildLightHtml(title, imageUrl);
+        String html = theme == Theme.DARK ? buildDarkHtml(article) : buildLightHtml(article);
 
         Path outputPath = storageDir.resolve(OUTPUT_FILENAME);
+        Path previewPath = storageDir.resolve("grid_preview.png");
+
+        // Force fresh generation: delete any cached output before re-rendering
+        Files.deleteIfExists(outputPath);
+        Files.deleteIfExists(previewPath);
 
         try (Playwright playwright = Playwright.create()) {
             try (Browser browser = playwright.chromium().launch()) {
                 BrowserContext ctx = browser.newContext(
-                        new Browser.NewContextOptions().setViewportSize(1080, 1080));
+                        new Browser.NewContextOptions().setViewportSize(1080, 1350));
                 Page page = ctx.newPage();
                 page.setContent(html);
                 page.waitForLoadState(LoadState.NETWORKIDLE,
@@ -54,10 +63,19 @@ public class ImageService {
                 page.screenshot(new Page.ScreenshotOptions()
                         .setPath(outputPath)
                         .setType(ScreenshotType.PNG));
+
+                // 1:1 grid-crop preview: Instagram profile grid shows the centered
+                // 1080×1080 region of the 1080×1350 post (Y=135 .. Y=1215).
+                page.screenshot(new Page.ScreenshotOptions()
+                        .setPath(previewPath)
+                        .setClip(0, 135, 1080, 1080)
+                        .setType(ScreenshotType.PNG));
             }
         }
 
         log.info("Image saved: {} ({})", outputPath.toAbsolutePath(), theme);
+        log.info("Grid preview saved: {} (1080x1080 crop, Y=135..Y=1215; logo top at Y=200 is inside the crop)",
+                previewPath.toAbsolutePath());
         return outputPath;
     }
 
@@ -78,11 +96,11 @@ public class ImageService {
         Path storageDir = Paths.get(STORAGE_DIR);
         Files.createDirectories(storageDir);
 
-        String title = article.getTitle() != null ? article.getTitle() : "";
-        String imageUrl = article.getImageUrl() != null ? article.getImageUrl() : "";
+        ensureKeyPhrase(article);
+
         String html = lastTheme == Theme.DARK
-                ? buildDarkStoryHtml(title, imageUrl)
-                : buildLightStoryHtml(title, imageUrl);
+                ? buildDarkStoryHtml(article)
+                : buildLightStoryHtml(article);
 
         Path outputPath = storageDir.resolve(STORY_FILENAME);
 
@@ -104,22 +122,42 @@ public class ImageService {
         return outputPath;
     }
 
-    // Escapes title and wraps the last 3 words in a yellow highlight span
-    private String buildTitleHtml(String title) {
-        String safe = title
-                .replace("&", "&amp;").replace("<", "&lt;")
-                .replace(">", "&gt;").replace("\"", "&quot;");
-        String[] words = safe.split(" ");
+    // Computes the key phrase once per article (LLM call) and stores it on the model.
+    private void ensureKeyPhrase(ArticleInfo article) {
+        if (article.getKeyPhrase() != null) return;
+        article.setKeyPhrase(captionService.findKeyPhrase(article.getTitle()));
+    }
+
+    // Wraps the LLM-identified key phrase in a yellow highlight span.
+    // Falls back to the last 3 words if no phrase is provided.
+    private String buildTitleHtml(String title, String keyPhrase) {
+        String safeTitle = escapeHtml(title);
+        if (keyPhrase != null && !keyPhrase.isBlank()) {
+            String safePhrase = escapeHtml(keyPhrase);
+            int idx = safeTitle.indexOf(safePhrase);
+            if (idx >= 0) {
+                return safeTitle.substring(0, idx)
+                        + "<span class=\"hl\">" + safePhrase + "</span>"
+                        + safeTitle.substring(idx + safePhrase.length());
+            }
+        }
+        String[] words = safeTitle.split(" ");
         if (words.length <= 3) {
-            return "<span class=\"hl\">" + safe + "</span>";
+            return "<span class=\"hl\">" + safeTitle + "</span>";
         }
         String normal = String.join(" ", Arrays.copyOf(words, words.length - 3));
         String highlighted = String.join(" ", Arrays.copyOfRange(words, words.length - 3, words.length));
         return normal + " <span class=\"hl\">" + highlighted + "</span>";
     }
 
-    private String buildDarkHtml(String title, String imageUrl) {
-        String safeImage = imageUrl.replace("'", "\\'");
+    private static String escapeHtml(String s) {
+        return s == null ? "" : s
+                .replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
+    private String buildDarkHtml(ArticleInfo article) {
+        String safeImage = safeImage(article.getImageUrl());
         return """
                 <!DOCTYPE html>
                 <html>
@@ -130,18 +168,20 @@ public class ImageService {
                 <style>
                   * { margin: 0; padding: 0; box-sizing: border-box; }
                   body {
-                    width: 1080px; height: 1080px;
+                    width: 1080px; height: 1350px;
                     overflow: hidden;
                     display: flex; flex-direction: column;
                   }
 
-                  /* ── top 50 %% ── */
+                  /* ── top 50 %% (675 of 1350) ──
+                     padding-top=200 keeps the logo inside Instagram's centered
+                     1080×1080 grid crop (visible band starts at Y=135) */
                   .top {
                     flex-shrink: 0;
-                    width: 1080px; height: 540px;
+                    width: 1080px; height: 675px;
                     background: #111111;
                     display: flex; flex-direction: column;
-                    padding: 80px;
+                    padding: 200px 120px 80px;
                   }
 
                   /* logo — single line: "the [VILNIUS]" */
@@ -165,10 +205,10 @@ public class ImageService {
                   .title {
                     width: 100%%;
                     font-family: 'League Spartan', sans-serif;
-                    font-weight: 700; font-size: 72px; line-height: 1.1;
+                    font-weight: 700; font-size: 58px; line-height: 0.95;
                     color: #ffffff;
                     display: -webkit-box;
-                    -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+                    -webkit-line-clamp: 5; -webkit-box-orient: vertical;
                     overflow: hidden;
                   }
                   .hl {
@@ -200,11 +240,11 @@ public class ImageService {
                   <div class="bottom"></div>
                 </body>
                 </html>
-                """.formatted(safeImage, buildTitleHtml(title));
+                """.formatted(safeImage, buildTitleHtml(article.getTitle(), article.getKeyPhrase()));
     }
 
-    private String buildDarkStoryHtml(String title, String imageUrl) {
-        String safeImage = imageUrl.replace("'", "\\'");
+    private String buildDarkStoryHtml(ArticleInfo article) {
+        String safeImage = safeImage(article.getImageUrl());
         return """
                 <!DOCTYPE html>
                 <html>
@@ -217,16 +257,17 @@ public class ImageService {
                   body {
                     width: 1080px; height: 1920px;
                     overflow: hidden;
+                    position: relative;
                     display: flex; flex-direction: column;
                   }
 
-                  /* top 60%% — text area; padding-top=280 pushes content below Instagram UI */
+                  /* top 60%% — text area; padding-top=250 pushes content below Instagram UI */
                   .top {
                     flex-shrink: 0;
                     width: 1080px; height: 1152px;
                     background: #111111;
                     display: flex; flex-direction: column;
-                    padding: 280px 80px 60px;
+                    padding: 250px 120px 60px;
                   }
 
                   .logo { display: inline-flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 40px; }
@@ -267,6 +308,32 @@ public class ImageService {
                     background-size: cover; background-position: center top;
                     background-color: #1c1c1c;
                   }
+
+                  /* CTA sticker — bottom-center, above IG's reply bar (~250px reserved) */
+                  .cta {
+                    position: absolute;
+                    left: 50%%;
+                    bottom: 300px;
+                    transform: translateX(-50%%);
+                    display: flex; flex-direction: column; align-items: center; gap: 14px;
+                    z-index: 10;
+                  }
+                  .cta-button {
+                    background: #FFD700;
+                    color: #111111;
+                    font-family: 'League Spartan', sans-serif;
+                    font-weight: 700;
+                    font-size: 30px;
+                    letter-spacing: 2px;
+                    text-transform: uppercase;
+                    padding: 22px 52px 24px;
+                    border-radius: 60px;
+                    white-space: nowrap;
+                    display: inline-flex; align-items: center; gap: 14px;
+                    box-shadow: 0 14px 44px rgba(0,0,0,0.55);
+                    line-height: 1;
+                  }
+                  .cta-arrow { font-size: 26px; line-height: 1; }
                 </style>
                 </head>
                 <body>
@@ -277,13 +344,16 @@ public class ImageService {
                     <div class="title">%s</div>
                   </div>
                   <div class="bottom"></div>
+                  <div class="cta">
+                    <div class="cta-button">Ссылка в шапке профиля <span class="cta-arrow">↑</span></div>
+                  </div>
                 </body>
                 </html>
-                """.formatted(safeImage, buildTitleHtml(title));
+                """.formatted(safeImage, buildTitleHtml(article.getTitle(), article.getKeyPhrase()));
     }
 
-    private String buildLightStoryHtml(String title, String imageUrl) {
-        String safeImage = imageUrl.replace("'", "\\'");
+    private String buildLightStoryHtml(ArticleInfo article) {
+        String safeImage = safeImage(article.getImageUrl());
         return """
                 <!DOCTYPE html>
                 <html>
@@ -296,16 +366,17 @@ public class ImageService {
                   body {
                     width: 1080px; height: 1920px;
                     overflow: hidden;
+                    position: relative;
                     display: flex; flex-direction: column;
                   }
 
-                  /* top 60%% — text area; padding-top=280 pushes content below Instagram UI */
+                  /* top 60%% — text area; padding-top=250 pushes content below Instagram UI */
                   .top {
                     flex-shrink: 0;
                     width: 1080px; height: 1152px;
                     background: #F4F0E6;
                     display: flex; flex-direction: column;
-                    padding: 280px 80px 60px;
+                    padding: 250px 120px 60px;
                   }
 
                   .logo { display: inline-flex; flex-direction: row; align-items: center; gap: 10px; margin-bottom: 40px; }
@@ -346,6 +417,32 @@ public class ImageService {
                     background-size: cover; background-position: center top;
                     background-color: #DDD9CE;
                   }
+
+                  /* CTA sticker — bottom-center, above IG's reply bar (~250px reserved) */
+                  .cta {
+                    position: absolute;
+                    left: 50%%;
+                    bottom: 300px;
+                    transform: translateX(-50%%);
+                    display: flex; flex-direction: column; align-items: center; gap: 14px;
+                    z-index: 10;
+                  }
+                  .cta-button {
+                    background: #FFD700;
+                    color: #111111;
+                    font-family: 'League Spartan', sans-serif;
+                    font-weight: 700;
+                    font-size: 30px;
+                    letter-spacing: 2px;
+                    text-transform: uppercase;
+                    padding: 22px 52px 24px;
+                    border-radius: 60px;
+                    white-space: nowrap;
+                    display: inline-flex; align-items: center; gap: 14px;
+                    box-shadow: 0 14px 44px rgba(0,0,0,0.45);
+                    line-height: 1;
+                  }
+                  .cta-arrow { font-size: 26px; line-height: 1; }
                 </style>
                 </head>
                 <body>
@@ -356,13 +453,16 @@ public class ImageService {
                     <div class="title">%s</div>
                   </div>
                   <div class="bottom"></div>
+                  <div class="cta">
+                    <div class="cta-button">Ссылка в шапке профиля <span class="cta-arrow">↑</span></div>
+                  </div>
                 </body>
                 </html>
-                """.formatted(safeImage, buildTitleHtml(title));
+                """.formatted(safeImage, buildTitleHtml(article.getTitle(), article.getKeyPhrase()));
     }
 
-    private String buildLightHtml(String title, String imageUrl) {
-        String safeImage = imageUrl.replace("'", "\\'");
+    private String buildLightHtml(ArticleInfo article) {
+        String safeImage = safeImage(article.getImageUrl());
         return """
                 <!DOCTYPE html>
                 <html>
@@ -373,18 +473,20 @@ public class ImageService {
                 <style>
                   * { margin: 0; padding: 0; box-sizing: border-box; }
                   body {
-                    width: 1080px; height: 1080px;
+                    width: 1080px; height: 1350px;
                     overflow: hidden;
                     display: flex; flex-direction: column;
                   }
 
-                  /* ── top 50 %% ── */
+                  /* ── top 50 %% (675 of 1350) ──
+                     padding-top=200 keeps the logo inside Instagram's centered
+                     1080×1080 grid crop (visible band starts at Y=135) */
                   .top {
                     flex-shrink: 0;
-                    width: 1080px; height: 540px;
+                    width: 1080px; height: 675px;
                     background: #F4F0E6;
                     display: flex; flex-direction: column;
-                    padding: 80px;
+                    padding: 200px 120px 80px;
                   }
 
                   /* logo — single line: "the [VILNIUS]" */
@@ -408,10 +510,10 @@ public class ImageService {
                   .title {
                     width: 100%%;
                     font-family: 'League Spartan', sans-serif;
-                    font-weight: 700; font-size: 72px; line-height: 1.1;
+                    font-weight: 700; font-size: 58px; line-height: 0.95;
                     color: #111111;
                     display: -webkit-box;
-                    -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+                    -webkit-line-clamp: 5; -webkit-box-orient: vertical;
                     overflow: hidden;
                   }
                   .hl {
@@ -443,6 +545,10 @@ public class ImageService {
                   <div class="bottom"></div>
                 </body>
                 </html>
-                """.formatted(safeImage, buildTitleHtml(title));
+                """.formatted(safeImage, buildTitleHtml(article.getTitle(), article.getKeyPhrase()));
+    }
+
+    private static String safeImage(String imageUrl) {
+        return imageUrl == null ? "" : imageUrl.replace("'", "\\'");
     }
 }

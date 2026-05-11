@@ -58,6 +58,32 @@ public class InstagramService {
         log.info("Story-only post done");
     }
 
+    // Attempts to update the IG Business Profile "website" field via Graph API.
+    // Not documented as writable on FB-Page-linked accounts, so this is best-effort:
+    // we log Meta's full response and never throw. Caller decides whether to retry/fallback.
+    public void updateProfileWebsite(String articleUrl) {
+        if (articleUrl == null || articleUrl.isBlank()) {
+            log.warn("Profile website update skipped — empty URL");
+            return;
+        }
+        try {
+            String body = "website=" + encode(articleUrl)
+                    + "&access_token=" + encode(accessToken);
+            HttpResponse<String> response = post(GRAPH_API + "/" + userId, body);
+            int status = response.statusCode();
+            String snippet = response.body() == null ? "" : response.body();
+            if (status >= 200 && status < 300 && !snippet.contains("\"error\"")) {
+                log.info("Profile website updated to {} (status={}, body={})", articleUrl, status, snippet);
+            } else {
+                log.warn("Profile website update rejected by Meta (status={}, body={}). " +
+                        "This endpoint is not generally writable on FB-Page-linked tokens — " +
+                        "consider the /latest redirect fallback.", status, snippet);
+            }
+        } catch (Exception e) {
+            log.warn("Profile website update failed (non-fatal): {}", e.getMessage());
+        }
+    }
+
     private void postStory(String imageUrl) throws Exception {
         log.info("Posting story...");
         String body = "image_url=" + encode(imageUrl)

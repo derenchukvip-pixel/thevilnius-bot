@@ -7,8 +7,6 @@ import org.example.service.CaptionService;
 import org.example.service.ImageService;
 import org.example.service.InstagramService;
 import org.example.service.ScraperService;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -30,7 +28,8 @@ public class PostScheduler {
     private final InstagramService instagramService;
     private final CaptionService captionService;
 
-    @EventListener(ApplicationReadyEvent.class)
+    // Fires daily at 10:00 (server timezone): second 0, minute 0, hour 10, every day.
+    @Scheduled(cron = "0 0 10 * * *")
     public void run() {
         try {
             log.info("Scheduler triggered");
@@ -50,6 +49,7 @@ public class PostScheduler {
             imageService.generateImage(article);
             imageService.generateStoryImage(article);
             instagramService.postImage(captionService.formatCaption(article.getContent()));
+            instagramService.updateProfileWebsite(article.getLink());
             appendHistory(article.getLink());
 
             log.info("Done: {}", article.getLink());
