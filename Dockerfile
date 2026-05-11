@@ -1,6 +1,6 @@
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
 # Uses a full JDK + Maven image so Playwright's CLI can download Chromium
-FROM maven:3.9-eclipse-temurin-21 AS builder
+FROM maven:3.9.6-eclipse-temurin-21-jammy AS builder
 
 WORKDIR /app
 
