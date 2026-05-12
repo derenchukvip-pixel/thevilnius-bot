@@ -60,7 +60,7 @@ public class CaptionService {
             Ответ: массовом ремонте дорог
             """;
 
-    @Value("${gemini.api-key}")
+    @Value("${gemini.api-key:}")
     private String apiKey;
 
     private final HttpClient    http   = HttpClient.newHttpClient();

@@ -39,4 +39,4 @@ build/
 
 ### App ###
 storage/
-src/main/resources/application.properties
+# application.properties is tracked — secrets passed via env vars at runtime
