@@ -17,7 +17,7 @@ import java.net.http.HttpResponse;
 public class CaptionService {
 
     private static final String API_URL_TEMPLATE =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=%s";
+            "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=%s";
 
     private static final String CAPTION_SYSTEM = """
             Ты — редактор Instagram-аккаунта «The Vilnius» — русскоязычное городское медиа о Вильнюсе.
@@ -118,14 +118,13 @@ public class CaptionService {
      * Endpoint: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=...
      */
     private String callGemini(String systemPrompt, String userContent, int maxOutputTokens) throws Exception {
-        // Build JSON request body manually to avoid extra dependencies
+        // Combine system prompt + user content into a single user message (v1 doesn't support systemInstruction)
+        String combinedText = systemPrompt.strip() + "\n\n" + userContent;
+
         String body = mapper.writeValueAsString(java.util.Map.of(
-                "systemInstruction", java.util.Map.of(
-                        "parts", java.util.List.of(java.util.Map.of("text", systemPrompt))
-                ),
                 "contents", java.util.List.of(java.util.Map.of(
                         "role", "user",
-                        "parts", java.util.List.of(java.util.Map.of("text", userContent))
+                        "parts", java.util.List.of(java.util.Map.of("text", combinedText))
                 )),
                 "generationConfig", java.util.Map.of(
                         "maxOutputTokens", maxOutputTokens,
