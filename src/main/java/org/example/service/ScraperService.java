@@ -31,7 +31,6 @@ public class ScraperService {
             .connectTimeout(Duration.ofSeconds(15))
             .build();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ArticleInfo scrapeLatestArticle() throws Exception {
         List<ArticleInfo> articles = scrapeArticles(1);
