@@ -89,7 +89,10 @@ public class PostScheduler {
             try {
                 imageService.generateImage(article);
                 imageService.generateStoryImage(article);
-                instagramService.postImage(captionService.formatCaption(article.getContent()));
+                log.info("Generating caption for: {}", article.getTitle());
+                String caption = captionService.formatCaption(article.getContent());
+                log.info("Caption ready ({} chars), posting to Instagram...", caption.length());
+                instagramService.postImage(caption);
                 instagramService.updateProfileWebsite(article.getLink());
                 appendHistory(article.getLink());
                 log.info("Done: {}", article.getLink());
