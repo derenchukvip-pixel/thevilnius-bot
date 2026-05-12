@@ -17,7 +17,7 @@ import java.net.http.HttpResponse;
 public class CaptionService {
 
     private static final String API_URL_TEMPLATE =
-            "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=%s";
+            "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=%s";
 
     private static final String CAPTION_SYSTEM = """
             Ты — редактор Instagram-аккаунта «The Vilnius» — русскоязычное городское медиа о Вильнюсе.
@@ -72,7 +72,7 @@ public class CaptionService {
             log.warn("⚠️  gemini.api-key is not set — caption/key-phrase generation will be skipped. " +
                      "Set the GEMINI_API_KEY environment variable to enable AI features.");
         } else {
-            log.info("Gemini API configured (gemini-1.5-flash)");
+            log.info("Gemini API configured (gemini-2.5-flash-lite)");
         }
     }
 
