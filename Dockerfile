@@ -25,11 +25,13 @@ FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
-# Node.js (required by Playwright Java to launch the browser driver at runtime)
+# Node.js 20 LTS via NodeSource (Ubuntu 22.04 default apt gives Node 12 — too old for Playwright 1.44)
 # + Chromium system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends \
       nodejs \
-      libnss3 libfreetype6 libharfbuzz0b ca-certificates \
+      libnss3 libfreetype6 libharfbuzz0b \
       fonts-freefont-ttf fontconfig libasound2 libgbm1 libxshmfence1 \
       libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
       libxdamage1 libxfixes3 libxrandr2 libxss1 libxtst6 \
