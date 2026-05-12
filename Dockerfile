@@ -19,35 +19,10 @@ RUN mvn exec:java \
 
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-FROM eclipse-temurin:21-jre-jammy
+# Official Playwright image already has ALL Chromium dependencies + Node.js + JDK
+FROM mcr.microsoft.com/playwright/java:v1.44.0-jammy
 
 WORKDIR /app
-
-# Install Node.js 20 (required by Playwright ≥1.44) + Chromium system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y --no-install-recommends \
-      nodejs \
-      libxkbcommon0 \
-      libnss3 \
-      libfreetype6 \
-      libharfbuzz0b \
-      fonts-freefont-ttf \
-      fontconfig \
-      libasound2 \
-      libgbm1 \
-      libxshmfence1 \
-      libatk1.0-0 \
-      libatk-bridge2.0-0 \
-      libcups2 \
-      libdrm2 \
-      libxcomposite1 \
-      libxdamage1 \
-      libxfixes3 \
-      libxrandr2 \
-      libxss1 \
-      libxtst6 \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy the built JAR
 COPY --from=builder /app/target/thevilnius2-instagram-posts-1.0-SNAPSHOT.jar app.jar
@@ -55,9 +30,9 @@ COPY --from=builder /app/target/thevilnius2-instagram-posts-1.0-SNAPSHOT.jar app
 # Copy pre-downloaded Playwright browsers
 COPY --from=builder /opt/pw-browsers /opt/pw-browsers
 
-# Point Playwright to the pre-downloaded browsers and system Node.js
+# Point Playwright to the pre-downloaded browsers (override the image default)
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
-ENV PLAYWRIGHT_NODEJS_PATH=/usr/bin/node
+
 
 # Persist generated images and history.txt across container restarts
 VOLUME /app/storage
@@ -65,3 +40,5 @@ VOLUME /app/storage
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
+
+
