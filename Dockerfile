@@ -20,21 +20,18 @@ RUN mvn exec:java \
 
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-FROM eclipse-temurin:21-jre-alpine
+# Must be Jammy (glibc), NOT Alpine (musl) — Playwright bundles a glibc node binary
+FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
-# System libraries required by Playwright Chromium on Alpine
-RUN apk add --no-cache \
-      chromium \
-      nss \
-      freetype \
-      harfbuzz \
-      ca-certificates \
-      ttf-freefont \
-      fontconfig \
-      udev \
-      font-noto
+# Chromium system dependencies for Ubuntu 22.04
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libnss3 libfreetype6 libharfbuzz0b ca-certificates \
+      fonts-freefont-ttf fontconfig libasound2 libgbm1 libxshmfence1 \
+      libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
+      libxdamage1 libxfixes3 libxrandr2 libxss1 libxtst6 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy the built JAR
 COPY --from=builder /app/target/thevilnius2-instagram-posts-1.0-SNAPSHOT.jar app.jar
@@ -59,4 +56,3 @@ VOLUME /app/storage
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
-
