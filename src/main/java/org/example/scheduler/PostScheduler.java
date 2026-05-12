@@ -49,11 +49,19 @@ public class PostScheduler {
         }
     }
 
-    /** Triggered once immediately when the application is fully started. */
+    /** Triggered once immediately when the application is fully started — runs in background thread. */
     @EventListener(ApplicationReadyEvent.class)
     public void runOnStartup() {
         log.info("Application ready — running startup publication check");
-        run();
+        Thread thread = new Thread(() -> {
+            try {
+                run();
+            } catch (Exception e) {
+                log.error("Startup publication check failed", e);
+            }
+        }, "startup-publisher");
+        thread.setDaemon(false);
+        thread.start();
     }
 
     // Fires daily at 10:00 (server timezone): second 0, minute 0, hour 10, every day.
@@ -63,7 +71,7 @@ public class PostScheduler {
             log.info("Scheduler triggered");
 
             Set<String> posted  = loadHistory();
-            List<ArticleInfo> allArticles = scraperService.scrapeArticles(10);
+            List<ArticleInfo> allArticles = scraperService.scrapeArticles(3);
 
             // Keep only articles that have not been posted yet, preserving newest-first order
             List<ArticleInfo> newArticles = allArticles.stream()
