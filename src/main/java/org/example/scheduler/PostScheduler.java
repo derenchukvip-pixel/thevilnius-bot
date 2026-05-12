@@ -64,14 +64,14 @@ public class PostScheduler {
         thread.start();
     }
 
-    // Fires daily at 10:00 (server timezone): second 0, minute 0, hour 10, every day.
-    @Scheduled(cron = "0 0 10 * * *")
+    // Fires every 30 minutes to pick up new unpublished articles one by one
+    @Scheduled(cron = "0 0/30 * * * *")
     public void run() {
         try {
             log.info("Scheduler triggered");
 
             Set<String> posted  = loadHistory();
-            List<ArticleInfo> allArticles = scraperService.scrapeArticles(3);
+            List<ArticleInfo> allArticles = scraperService.scrapeArticles(10);
 
             // Keep only articles that have not been posted yet, preserving newest-first order
             List<ArticleInfo> newArticles = allArticles.stream()
@@ -83,29 +83,18 @@ public class PostScheduler {
                 return;
             }
 
-            log.info("Found {} new article(s) to post", newArticles.size());
-
-            for (int i = 0; i < newArticles.size(); i++) {
-                ArticleInfo article = newArticles.get(i);
-                try {
-                    log.info("Processing [{}/{}]: {}", i + 1, newArticles.size(), article.getLink());
-
-                    imageService.generateImage(article);
-                    imageService.generateStoryImage(article);
-                    instagramService.postImage(captionService.formatCaption(article.getContent()));
-                    instagramService.updateProfileWebsite(article.getLink());
-                    appendHistory(article.getLink());
-
-                    log.info("Done: {}", article.getLink());
-                } catch (Exception e) {
-                    log.error("Failed to post article '{}' — skipping", article.getLink(), e);
-                }
-
-                // Protective delay between posts to avoid Instagram spam-block
-                if (i < newArticles.size() - 1) {
-                    log.info("Waiting 60 s before next article…");
-                    Thread.sleep(60_000);
-                }
+            // Publish only 1 article per run to avoid OOM (Chromium memory pressure)
+            ArticleInfo article = newArticles.get(0);
+            log.info("Publishing 1 new article ({}  unpublished total): {}", newArticles.size(), article.getLink());
+            try {
+                imageService.generateImage(article);
+                imageService.generateStoryImage(article);
+                instagramService.postImage(captionService.formatCaption(article.getContent()));
+                instagramService.updateProfileWebsite(article.getLink());
+                appendHistory(article.getLink());
+                log.info("Done: {}", article.getLink());
+            } catch (Exception e) {
+                log.error("Failed to post article '{}' — skipping", article.getLink(), e);
             }
 
         } catch (Exception e) {
