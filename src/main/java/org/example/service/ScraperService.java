@@ -9,6 +9,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -27,7 +28,14 @@ public class ScraperService {
     @Value("${supabase.anon-key}")
     private String supabaseAnonKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public ScraperService() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(15_000);
+        factory.setReadTimeout(30_000);
+        this.restTemplate = new RestTemplate(factory);
+    }
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ArticleInfo scrapeLatestArticle() throws Exception {
@@ -44,6 +52,8 @@ public class ScraperService {
                 + "?order=published_at.desc&limit=" + limit
                 + "&status=eq.published&category=eq.news"
                 + "&select=title,slug,image_url,content";
+
+        log.info("Fetching articles from Supabase: {}", url);
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("apikey", supabaseAnonKey);
