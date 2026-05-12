@@ -25,8 +25,10 @@ FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
-# Chromium system dependencies for Ubuntu 22.04
+# Node.js (required by Playwright Java to launch the browser driver at runtime)
+# + Chromium system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
+      nodejs \
       libnss3 libfreetype6 libharfbuzz0b ca-certificates \
       fonts-freefont-ttf fontconfig libasound2 libgbm1 libxshmfence1 \
       libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
@@ -39,7 +41,8 @@ COPY --from=builder /app/target/thevilnius2-instagram-posts-1.0-SNAPSHOT.jar app
 # Copy pre-downloaded Playwright browsers
 COPY --from=builder /opt/pw-browsers /opt/pw-browsers
 
-# Point Playwright to the pre-downloaded browsers
+# Tell Playwright to use system Node instead of the bundled one from the JAR
+ENV PLAYWRIGHT_NODEJS_PATH=/usr/bin/node
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
 
 # Required environment variables (provide via -e flags or a .env file at runtime):
