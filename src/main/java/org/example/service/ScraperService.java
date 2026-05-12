@@ -5,14 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.example.model.ArticleInfo;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,14 +27,10 @@ public class ScraperService {
     @Value("${supabase.anon-key}")
     private String supabaseAnonKey;
 
-    private final RestTemplate restTemplate;
-
-    public ScraperService() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(15_000);
-        factory.setReadTimeout(30_000);
-        this.restTemplate = new RestTemplate(factory);
-    }
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(15))
+            .build();
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ArticleInfo scrapeLatestArticle() throws Exception {
@@ -55,14 +50,18 @@ public class ScraperService {
 
         log.info("Fetching articles from Supabase: {}", url);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("apikey", supabaseAnonKey);
-        headers.set("Authorization", "Bearer " + supabaseAnonKey);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(30))
+                .header("apikey", supabaseAnonKey)
+                .header("Authorization", "Bearer " + supabaseAnonKey)
+                .GET()
+                .build();
 
-        ResponseEntity<String> response = restTemplate.exchange(
-                url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        log.info("Supabase response status: {}", response.statusCode());
 
-        JsonNode root = objectMapper.readTree(response.getBody());
+        JsonNode root = objectMapper.readTree(response.body());
         if (!root.isArray() || root.isEmpty()) {
             log.warn("Supabase returned no news articles");
             return List.of();
