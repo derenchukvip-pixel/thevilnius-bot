@@ -1,5 +1,4 @@
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
-# Uses a full JDK + Maven image so Playwright's CLI can download Chromium
 FROM maven:3.9.6-eclipse-temurin-21-jammy AS builder
 
 WORKDIR /app
@@ -12,7 +11,7 @@ RUN mvn dependency:go-offline -q
 COPY src ./src
 RUN mvn clean package -DskipTests
 
-# Install ALL browsers so runtime never needs to download anything
+# Download ALL Playwright browsers into a fixed directory so it can be copied
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
 RUN mvn exec:java \
       -Dexec.mainClass="com.microsoft.playwright.CLI" \
@@ -20,21 +19,34 @@ RUN mvn exec:java \
 
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-# Must be Jammy (glibc), NOT Alpine (musl) — Playwright bundles a glibc node binary
 FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
-# Node.js 20 LTS via NodeSource (Ubuntu 22.04 default apt gives Node 12 — too old for Playwright 1.44)
-# + Chromium system dependencies
+# Install Node.js 20 (required by Playwright ≥1.44) + Chromium system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends \
       nodejs \
-      libnss3 libfreetype6 libharfbuzz0b \
-      fonts-freefont-ttf fontconfig libasound2 libgbm1 libxshmfence1 \
-      libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 \
-      libxdamage1 libxfixes3 libxrandr2 libxss1 libxtst6 \
+      libxkbcommon0 \
+      libnss3 \
+      libfreetype6 \
+      libharfbuzz0b \
+      fonts-freefont-ttf \
+      fontconfig \
+      libasound2 \
+      libgbm1 \
+      libxshmfence1 \
+      libatk1.0-0 \
+      libatk-bridge2.0-0 \
+      libcups2 \
+      libdrm2 \
+      libxcomposite1 \
+      libxdamage1 \
+      libxfixes3 \
+      libxrandr2 \
+      libxss1 \
+      libxtst6 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the built JAR
@@ -43,17 +55,9 @@ COPY --from=builder /app/target/thevilnius2-instagram-posts-1.0-SNAPSHOT.jar app
 # Copy pre-downloaded Playwright browsers
 COPY --from=builder /opt/pw-browsers /opt/pw-browsers
 
-# Tell Playwright to use system Node instead of the bundled one from the JAR
-ENV PLAYWRIGHT_NODEJS_PATH=/usr/bin/node
+# Point Playwright to the pre-downloaded browsers and system Node.js
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
-
-# Required environment variables (provide via -e flags or a .env file at runtime):
-#   ANTHROPIC_API_KEY
-#   SUPABASE_URL
-#   SUPABASE_ANON_KEY
-#   INSTAGRAM_USER_ID
-#   INSTAGRAM_TOKEN
-#   APP_PUBLIC_URL
+ENV PLAYWRIGHT_NODEJS_PATH=/usr/bin/node
 
 # Persist generated images and history.txt across container restarts
 VOLUME /app/storage
