@@ -12,11 +12,11 @@ RUN mvn dependency:go-offline -q
 COPY src ./src
 RUN mvn clean package -DskipTests
 
-# Download Playwright's Chromium into a fixed directory so it can be copied
+# Install ALL browsers so runtime never needs to download anything
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
 RUN mvn exec:java \
       -Dexec.mainClass="com.microsoft.playwright.CLI" \
-      -Dexec.args="install --with-deps chromium"
+      -Dexec.args="install --with-deps"
 
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────

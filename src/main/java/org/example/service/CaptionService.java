@@ -17,7 +17,7 @@ import java.net.http.HttpResponse;
 public class CaptionService {
 
     private static final String API_URL_TEMPLATE =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=%s";
+            "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=%s";
 
     private static final String CAPTION_SYSTEM = """
             Ты — редактор Instagram-аккаунта «The Vilnius» — русскоязычное городское медиа о Вильнюсе.
