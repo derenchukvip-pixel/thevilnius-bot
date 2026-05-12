@@ -8,6 +8,8 @@ import org.example.service.CaptionService;
 import org.example.service.ImageService;
 import org.example.service.InstagramService;
 import org.example.service.ScraperService;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -45,6 +47,13 @@ public class PostScheduler {
         } catch (Exception e) {
             log.error("Failed to initialise storage directory / history.txt", e);
         }
+    }
+
+    /** Triggered once immediately when the application is fully started. */
+    @EventListener(ApplicationReadyEvent.class)
+    public void runOnStartup() {
+        log.info("Application ready — running startup publication check");
+        run();
     }
 
     // Fires daily at 10:00 (server timezone): second 0, minute 0, hour 10, every day.
