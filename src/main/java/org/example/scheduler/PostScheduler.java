@@ -20,6 +20,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
 @Component
@@ -33,6 +34,9 @@ public class PostScheduler {
     private final ImageService      imageService;
     private final InstagramService  instagramService;
     private final CaptionService    captionService;
+
+    /** Guards against concurrent runs (startup-publisher vs cron firing simultaneously). */
+    private final ReentrantLock runLock = new ReentrantLock();
 
     /** Ensures storage/ and history.txt exist at startup so the app never fails on first run. */
     @PostConstruct
@@ -67,10 +71,22 @@ public class PostScheduler {
     // Fires every 30 minutes to pick up new unpublished articles one by one
     @Scheduled(cron = "0 0/30 * * * *")
     public void run() {
+        if (!runLock.tryLock()) {
+            log.info("Scheduler skipped — another run is already in progress");
+            return;
+        }
+        try {
+            doRun();
+        } finally {
+            runLock.unlock();
+        }
+    }
+
+    private void doRun() {
         try {
             log.info("Scheduler triggered");
 
-            Set<String> posted  = loadHistory();
+            Set<String> posted = loadHistory();
             List<ArticleInfo> allArticles = scraperService.scrapeArticles(10);
 
             // Keep only articles that have not been posted yet, preserving newest-first order
@@ -85,7 +101,7 @@ public class PostScheduler {
 
             // Publish only 1 article per run to avoid OOM (Chromium memory pressure)
             ArticleInfo article = newArticles.get(0);
-            log.info("Publishing 1 new article ({}  unpublished total): {}", newArticles.size(), article.getLink());
+            log.info("Publishing 1 new article ({} unpublished total): {}", newArticles.size(), article.getLink());
             try {
                 imageService.generateImage(article);
                 imageService.generateStoryImage(article);
