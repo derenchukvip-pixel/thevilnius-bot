@@ -26,8 +26,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class PostScheduler {
 
-    private static final Path HISTORY     = Paths.get("history.txt");
     private static final Path STORAGE_DIR = Paths.get("storage");
+    private static final Path HISTORY     = STORAGE_DIR.resolve("history.txt");
 
     private final ScraperService    scraperService;
     private final ImageService      imageService;
