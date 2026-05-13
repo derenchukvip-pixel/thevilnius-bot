@@ -80,16 +80,25 @@ public class CaptionService {
         if (rawContent == null || rawContent.isBlank()) return "";
         if (apiKey == null || apiKey.isBlank()) {
             log.warn("Gemini API key not set — returning raw content as caption");
-            return rawContent;
+            return truncate(rawContent);
         }
         try {
             String result = callGemini(CAPTION_SYSTEM, rawContent, 4096);
+            result = truncate(result);
             log.info("Caption formatted ({} chars)", result.length());
             return result;
         } catch (Exception e) {
             log.error("Caption Gemini call failed — falling back to raw content", e);
-            return rawContent;
+            return truncate(rawContent);
         }
+    }
+
+    /** Hard-trims caption to Instagram's 2200-char limit, cutting at the last newline before the limit. */
+    private static String truncate(String text) {
+        if (text == null || text.length() <= INSTAGRAM_MAX_CAPTION) return text;
+        String cut = text.substring(0, INSTAGRAM_MAX_CAPTION);
+        int lastNl = cut.lastIndexOf('\n');
+        return (lastNl > INSTAGRAM_MAX_CAPTION / 2 ? cut.substring(0, lastNl) : cut).stripTrailing();
     }
 
     public String findKeyPhrase(String title) {
