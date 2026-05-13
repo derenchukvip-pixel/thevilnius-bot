@@ -16,6 +16,9 @@ import java.net.http.HttpResponse;
 @Service
 public class CaptionService {
 
+    /** Instagram hard limit for caption length. */
+    private static final int INSTAGRAM_MAX_CAPTION = 2200;
+
     private static final String API_URL_TEMPLATE =
             "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=%s";
 
