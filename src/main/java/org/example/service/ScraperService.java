@@ -70,6 +70,7 @@ public class ScraperService {
         for (JsonNode node : root) {
             ArticleInfo info = new ArticleInfo();
             info.setTitle(node.path("title").asText(null));
+            info.setSlug(node.path("slug").asText(null));
             info.setLink(SITE_BASE + "/articles/" + node.path("slug").asText());
             info.setImageUrl(node.path("image_url").asText(null));
             info.setContent(node.path("content").asText(null));
@@ -77,5 +78,35 @@ public class ScraperService {
             results.add(info);
         }
         return results;
+    }
+
+    /**
+     * Sets posted_at = NOW() for the given slug so it won't be fetched again.
+     */
+    public void markAsPosted(String slug) throws Exception {
+        if (slug == null || slug.isBlank()) {
+            log.warn("markAsPosted called with blank slug — skipping");
+            return;
+        }
+        String url = supabaseUrl + "/rest/v1/articles?slug=eq." + slug;
+        String body = "{\"posted_at\":\"" + java.time.Instant.now() + "\"}";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(15))
+                .header("apikey", supabaseAnonKey)
+                .header("Authorization", "Bearer " + supabaseAnonKey)
+                .header("Content-Type", "application/json")
+                .header("Prefer", "return=minimal")
+                .method("PATCH", HttpRequest.BodyPublishers.ofString(body))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+            log.info("Marked as posted in Supabase: slug='{}'", slug);
+        } else {
+            log.error("Failed to mark as posted: slug='{}', status={}, body={}",
+                    slug, response.statusCode(), response.body());
+        }
     }
 }
