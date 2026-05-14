@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -27,8 +28,9 @@ import java.util.concurrent.locks.ReentrantLock;
 @RequiredArgsConstructor
 public class PostScheduler {
 
-    private static final Path STORAGE_DIR = Paths.get("storage");
-    private static final Path HISTORY     = STORAGE_DIR.resolve("history.txt");
+    private static final Path STORAGE_DIR   = Paths.get("storage");
+    private static final Path HISTORY       = STORAGE_DIR.resolve("history.txt");
+    private static final int  MAX_PER_DAY   = 3;
 
     private final ScraperService    scraperService;
     private final ImageService      imageService;
@@ -86,10 +88,28 @@ public class PostScheduler {
         try {
             log.info("Scheduler triggered");
 
-            Set<String> posted = loadHistory();
-            List<ArticleInfo> allArticles = scraperService.scrapeArticles(10);
+            List<String> historyLines = Files.exists(HISTORY)
+                    ? Files.readAllLines(HISTORY) : List.of();
+            Set<String> posted = new HashSet<>();
+            long todayCount = 0;
+            String todayPrefix = "# " + LocalDate.now();
+            for (String line : historyLines) {
+                String t = line.strip();
+                if (t.isEmpty()) continue;
+                if (t.startsWith("# ")) {
+                    // dated marker line — count today's posts
+                    if (t.startsWith(todayPrefix)) todayCount++;
+                } else {
+                    posted.add(t);
+                }
+            }
 
-            // Keep only articles that have not been posted yet, preserving newest-first order
+            if (todayCount >= MAX_PER_DAY) {
+                log.info("Daily limit reached ({}/{} posts today) — skipping", todayCount, MAX_PER_DAY);
+                return;
+            }
+
+            List<ArticleInfo> allArticles = scraperService.scrapeArticles(10);
             List<ArticleInfo> newArticles = allArticles.stream()
                     .filter(a -> a.getLink() != null && !posted.contains(a.getLink().strip()))
                     .toList();
@@ -101,7 +121,8 @@ public class PostScheduler {
 
             // Publish only 1 article per run to avoid OOM (Chromium memory pressure)
             ArticleInfo article = newArticles.get(0);
-            log.info("Publishing 1 new article ({} unpublished total): {}", newArticles.size(), article.getLink());
+            log.info("Publishing 1 new article ({} unpublished total, {}/{} today): {}",
+                    newArticles.size(), todayCount, MAX_PER_DAY, article.getLink());
             try {
                 imageService.generateImage(article);
                 imageService.generateStoryImage(article);
@@ -109,8 +130,10 @@ public class PostScheduler {
                 String caption = captionService.formatCaption(article.getContent());
                 log.info("Caption ready ({} chars), posting to Instagram...", caption.length());
                 instagramService.postImage(caption);
-                instagramService.updateProfileWebsite(article.getLink());
+                // Write history BEFORE profile-update so a crash there won't cause a double-post
                 appendHistory(article.getLink());
+                log.info("Saved to history: {}", article.getLink());
+                instagramService.updateProfileWebsite(article.getLink());
                 log.info("Done: {}", article.getLink());
             } catch (Exception e) {
                 log.error("Failed to post article '{}' — skipping", article.getLink(), e);
@@ -121,19 +144,10 @@ public class PostScheduler {
         }
     }
 
-    /** Loads every URL that has already been posted into a Set for O(1) lookup. */
-    private Set<String> loadHistory() throws Exception {
-        if (!Files.exists(HISTORY)) return new HashSet<>();
-        Set<String> seen = new HashSet<>();
-        for (String line : Files.readAllLines(HISTORY)) {
-            String trimmed = line.strip();
-            if (!trimmed.isEmpty()) seen.add(trimmed);
-        }
-        return seen;
-    }
-
     private void appendHistory(String link) throws Exception {
-        Files.writeString(HISTORY, link + System.lineSeparator(),
-                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        // Write a dated marker on a separate line, then the URL
+        String entry = "# " + LocalDate.now() + System.lineSeparator()
+                + link + System.lineSeparator();
+        Files.writeString(HISTORY, entry, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
     }
 }
