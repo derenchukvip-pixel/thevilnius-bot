@@ -38,7 +38,7 @@ public class InstagramService {
         String creationId = createMediaContainer(feedImageUrl, caption);
         log.info("Media container created: {}", creationId);
 
-        awaitContainerReady(creationId);
+        awaitContainerReady(creationId, 20); // 20 attempts × 3s = 60s max for feed
         publishMedia(creationId);
         log.info("Published to feed successfully");
 
@@ -97,7 +97,7 @@ public class InstagramService {
         requireField(json, "id", response.body());
         String storyContainerId = json.get("id").asText();
 
-        awaitContainerReady(storyContainerId);
+        awaitContainerReady(storyContainerId, 10); // 10 attempts × 3s = 30s max for story
 
         String publishBody = "creation_id=" + encode(storyContainerId)
                 + "&access_token=" + encode(accessToken);
@@ -120,12 +120,11 @@ public class InstagramService {
         return json.get("id").asText();
     }
 
-    private void awaitContainerReady(String creationId) throws Exception {
+    private void awaitContainerReady(String creationId, int maxAttempts) throws Exception {
         String url = GRAPH_API + "/" + creationId
                 + "?fields=status_code&access_token=" + encode(accessToken);
         HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
 
-        int maxAttempts = 20;
         for (int i = 1; i <= maxAttempts; i++) {
             Thread.sleep(3_000);
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
