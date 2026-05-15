@@ -39,7 +39,6 @@ public class ScrapeTestController {
         imageService.generateStoryImage(article);
         String caption = captionService.formatCaption(article.getContent());
         instagramService.postImage(caption);
-        instagramService.updateProfileWebsite(article.getLink());
         return "Force-posted: " + article.getTitle();
     }
 
