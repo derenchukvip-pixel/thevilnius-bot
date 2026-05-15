@@ -21,9 +21,18 @@ public class CronTickController {
 
     @GetMapping("/cron/tick")
     public String tick() {
-        log.info("External cron tick received — triggering publication check");
-        postScheduler.run();
+        log.info("External cron tick received — triggering publication check in background");
+        Thread thread = new Thread(() -> {
+            try {
+                postScheduler.run();
+            } catch (Exception e) {
+                log.error("Background publication check failed", e);
+            }
+        }, "cron-tick-publisher");
+        thread.setDaemon(false);
+        thread.start();
         return "ok";
     }
 }
+
 
