@@ -45,6 +45,7 @@ public class ScraperService {
         String url = supabaseUrl + "/rest/v1/articles"
                 + "?order=published_at.desc&limit=" + limit
                 + "&status=eq.published&category=eq.news"
+                + "&posted_at=is.null"
                 + "&select=title,slug,image_url,content";
 
         log.info("Fetching articles from Supabase: {}", url);
@@ -94,8 +95,8 @@ public class ScraperService {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofSeconds(15))
-                .header("apikey", supabaseAnonKey)
-                .header("Authorization", "Bearer " + supabaseAnonKey)
+                .header("apikey", supabaseServiceKey)
+                .header("Authorization", "Bearer " + supabaseServiceKey)
                 .header("Content-Type", "application/json")
                 .header("Prefer", "return=minimal")
                 .method("PATCH", HttpRequest.BodyPublishers.ofString(body))
