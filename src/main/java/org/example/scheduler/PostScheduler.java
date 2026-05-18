@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.model.ArticleInfo;
 import org.example.service.CaptionService;
+import org.example.service.HistoryService;
 import org.example.service.ImageService;
 import org.example.service.InstagramService;
 import org.example.service.ScraperService;
@@ -30,11 +31,10 @@ public class PostScheduler {
     private final ImageService     imageService;
     private final InstagramService instagramService;
     private final CaptionService   captionService;
+    private final HistoryService   historyService;
 
-    /** Guards against concurrent runs (startup-publisher vs cron firing simultaneously). */
     private final ReentrantLock runLock = new ReentrantLock();
 
-    /** Ensures storage/ exists at startup so image files can be written. */
     @PostConstruct
     public void init() {
         try {
@@ -45,7 +45,6 @@ public class PostScheduler {
         }
     }
 
-    /** Triggered once immediately when the application is fully started — runs in background thread. */
     @EventListener(ApplicationReadyEvent.class)
     public void runOnStartup() {
         log.info("Application ready — running startup publication check");
@@ -60,7 +59,6 @@ public class PostScheduler {
         thread.start();
     }
 
-    // Fires every 30 minutes to pick up new unpublished articles one by one
     @Scheduled(cron = "0 0/30 * * * *")
     public void run() {
         if (!runLock.tryLock()) {
@@ -78,18 +76,27 @@ public class PostScheduler {
         try {
             log.info("Scheduler triggered");
 
-            // Supabase query already filters posted_at=is.null — only unposted articles returned
-            List<ArticleInfo> newArticles = scraperService.scrapeArticles(10);
+            List<ArticleInfo> allArticles = scraperService.scrapeArticles(10);
+            if (allArticles.isEmpty()) {
+                log.info("No articles returned from Supabase — skipping");
+                return;
+            }
+
+            // Filter out already-posted articles using HistoryService (backed by GitHub)
+            List<ArticleInfo> newArticles = allArticles.stream()
+                    .filter(a -> !historyService.isPosted(a.getSlug()))
+                    .toList();
 
             if (newArticles.isEmpty()) {
-                log.info("No new articles found — skipping");
+                log.info("All {} fetched articles already posted — skipping", allArticles.size());
                 return;
             }
 
             // Publish only 1 article per run to avoid OOM (Chromium memory pressure)
             ArticleInfo article = newArticles.get(0);
-            log.info("Publishing 1 new article ({} unpublished total): {}",
-                    newArticles.size(), article.getLink());
+            log.info("Publishing article ({} new out of {} total): {}",
+                    newArticles.size(), allArticles.size(), article.getLink());
+
             try {
                 imageService.generateImage(article);
                 imageService.generateStoryImage(article);
@@ -97,8 +104,9 @@ public class PostScheduler {
                 String caption = captionService.formatCaption(article.getContent());
                 log.info("Caption ready ({} chars), posting to Instagram...", caption.length());
                 instagramService.postImage(caption);
-                // Mark as posted in Supabase BEFORE anything else so a crash won't cause a double-post
-                scraperService.markAsPosted(article.getSlug());
+
+                // Mark as posted BEFORE anything else so a crash won't cause a double-post
+                historyService.markAsPosted(article.getSlug());
                 log.info("Done: {}", article.getLink());
             } catch (Exception e) {
                 log.error("Failed to post article '{}' — skipping", article.getLink(), e);
