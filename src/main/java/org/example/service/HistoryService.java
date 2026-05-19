@@ -11,6 +11,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Collections;
@@ -18,9 +21,12 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Persists the set of already-posted article slugs as a JSON file
- * (data/posted_slugs.json) in the GitHub repository via Contents API.
- * No database / Supabase schema changes required.
+ * Persists posted article slugs with two layers:
+ *  1. LOCAL  — storage/posted_slugs.json  (fast, survives restarts within same Render instance)
+ *  2. GITHUB — data/posted_slugs.json in the repo (survives re-deploys)
+ *
+ * On startup: loads from GitHub first, then merges with local file.
+ * On save:    writes local file first (fast), then uploads to GitHub (best-effort).
  */
 @Slf4j
 @Service
@@ -35,8 +41,9 @@ public class HistoryService {
     @Value("${github.repo.name}")
     private String repoName;
 
-    private static final String FILE_PATH = "data/posted_slugs.json";
-    private static final String API_BASE  = "https://api.github.com";
+    private static final String   GITHUB_FILE_PATH = "data/posted_slugs.json";
+    private static final String   API_BASE         = "https://api.github.com";
+    private static final Path     LOCAL_FILE       = Paths.get("storage/posted_slugs.json");
 
     private final HttpClient   http   = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(15))
@@ -44,12 +51,13 @@ public class HistoryService {
     private final ObjectMapper mapper = new ObjectMapper();
 
     private final Set<String> posted = Collections.synchronizedSet(new HashSet<>());
-    /** SHA of the current file in GitHub — required for updates (PUT). */
     private String currentSha = null;
 
     @PostConstruct
     public void init() {
-        loadFromGitHub();
+        loadFromGitHub();   // primary source (persistent across redeploys)
+        loadFromLocal();    // merge with local (survives restarts within same instance)
+        log.info("HistoryService ready — {} slugs loaded", posted.size());
     }
 
     public boolean isPosted(String slug) {
@@ -59,14 +67,45 @@ public class HistoryService {
     public void markAsPosted(String slug) {
         if (slug == null || slug.isBlank()) return;
         posted.add(slug);
-        saveToGitHub();
+        saveToLocal();      // fast, always works
+        saveToGitHub();     // persistent across redeploys (requires token write access)
         log.info("Marked as posted: slug='{}'  (total history: {})", slug, posted.size());
     }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Local file (storage/posted_slugs.json)
+    // ────────────────────────────────────────────────────────────────────────────
+
+    private void loadFromLocal() {
+        try {
+            if (Files.exists(LOCAL_FILE)) {
+                String[] slugs = mapper.readValue(LOCAL_FILE.toFile(), String[].class);
+                int before = posted.size();
+                for (String s : slugs) posted.add(s);
+                log.info("Merged {} slugs from local file (total: {})", posted.size() - before, posted.size());
+            }
+        } catch (Exception e) {
+            log.warn("Could not load local history file: {}", e.getMessage());
+        }
+    }
+
+    private void saveToLocal() {
+        try {
+            Files.createDirectories(LOCAL_FILE.getParent());
+            mapper.writeValue(LOCAL_FILE.toFile(), posted);
+        } catch (Exception e) {
+            log.warn("Could not save local history file: {}", e.getMessage());
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // GitHub Contents API (data/posted_slugs.json in repo)
+    // ────────────────────────────────────────────────────────────────────────────
 
     private void loadFromGitHub() {
         try {
             String url = API_BASE + "/repos/" + repoOwner + "/" + repoName
-                    + "/contents/" + FILE_PATH;
+                    + "/contents/" + GITHUB_FILE_PATH;
 
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -89,6 +128,10 @@ public class HistoryService {
                 log.info("Loaded {} posted slugs from GitHub (sha={})", posted.size(), currentSha);
             } else if (res.statusCode() == 404) {
                 log.info("No history file yet in GitHub — starting fresh");
+            } else if (res.statusCode() == 403 || res.statusCode() == 401) {
+                log.warn("GitHub token has no READ access to repo contents (status={}). " +
+                         "Fix: GitHub → token → Repository permissions → Contents → Read and Write",
+                         res.statusCode());
             } else {
                 log.warn("Unexpected status loading history from GitHub: {} — {}",
                         res.statusCode(), res.body());
@@ -101,7 +144,7 @@ public class HistoryService {
     private void saveToGitHub() {
         try {
             String url = API_BASE + "/repos/" + repoOwner + "/" + repoName
-                    + "/contents/" + FILE_PATH;
+                    + "/contents/" + GITHUB_FILE_PATH;
 
             String jsonContent = mapper.writeValueAsString(posted);
             String encoded     = Base64.getEncoder().encodeToString(jsonContent.getBytes());
@@ -131,6 +174,10 @@ public class HistoryService {
                 JsonNode json = mapper.readTree(res.body());
                 currentSha = json.path("content").path("sha").asText(currentSha);
                 log.info("History saved to GitHub ({} slugs, sha={})", posted.size(), currentSha);
+            } else if (res.statusCode() == 403 || res.statusCode() == 401) {
+                log.warn("GitHub token has no WRITE access (status={}). History saved locally only. " +
+                         "Fix: GitHub → token → Repository permissions → Contents → Read and Write",
+                         res.statusCode());
             } else {
                 log.warn("Failed to save history to GitHub: status={}, body={}",
                         res.statusCode(), res.body());
@@ -140,3 +187,4 @@ public class HistoryService {
         }
     }
 }
+
