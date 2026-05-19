@@ -36,14 +36,16 @@ public class ImageService {
     /**
      * Generates BOTH feed (1080×1350) and story (1080×1920) images using a SINGLE
      * Chromium instance to keep peak memory within Render's 512 MB free-tier limit.
+     *
+     * @param isDark true → DARK theme, false → LIGHT theme
      */
-    public void generateBothImages(ArticleInfo article) throws Exception {
+    public void generateBothImages(ArticleInfo article, boolean isDark) throws Exception {
         Path storageDir = Paths.get(STORAGE_DIR);
         Files.createDirectories(storageDir);
 
         ensureKeyPhrase(article);
 
-        Theme theme = nextTheme();
+        Theme theme = isDark ? Theme.DARK : Theme.LIGHT;
         lastTheme = theme;
         log.info("Using {} theme", theme);
 
@@ -92,9 +94,9 @@ public class ImageService {
         }
     }
 
-    /** @deprecated Use {@link #generateBothImages(ArticleInfo)} instead. */
+    /** @deprecated Use {@link #generateBothImages(ArticleInfo, boolean)} instead. */
     public Path generateImage(ArticleInfo article) throws Exception {
-        generateBothImages(article);
+        generateBothImages(article, false);
         return Paths.get(STORAGE_DIR, OUTPUT_FILENAME);
     }
 
@@ -279,9 +281,7 @@ public class ImageService {
                     font-family: 'League Spartan', sans-serif;
                     font-weight: 700; font-size: 96px; line-height: 0.95;
                     color: #ffffff;
-                    display: -webkit-box;
-                    -webkit-line-clamp: 5; -webkit-box-orient: vertical;
-                    overflow: hidden;
+                    word-break: break-word;
                   }
                   .hl {
                     background: #FFD700; color: #111111;
@@ -331,15 +331,34 @@ public class ImageService {
                     <div class="logo">
                       <span class="logo-the">the</span><span class="logo-vilnius">VILNIUS</span>
                     </div>
-                    <div class="title">%s</div>
+                    <div class="title" id="storyTitle">%s</div>
                   </div>
                   <div class="bottom"></div>
                   <div class="cta">
                     <div class="cta-button">Ссылка в шапке профиля <span class="cta-arrow">↑</span></div>
                   </div>
+                  <script>
+                    (function() {
+                      var titleEl = document.getElementById('storyTitle');
+                      var topEl = titleEl.parentElement;
+                      var logoEl = topEl.querySelector('.logo');
+                      var cs = getComputedStyle(topEl);
+                      var available = topEl.clientHeight
+                        - parseFloat(cs.paddingTop)
+                        - parseFloat(cs.paddingBottom)
+                        - logoEl.offsetHeight
+                        - parseFloat(getComputedStyle(logoEl).marginBottom);
+                      var fontSize = 96;
+                      titleEl.style.fontSize = fontSize + 'px';
+                      while (titleEl.scrollHeight > available && fontSize > 44) {
+                        fontSize -= 2;
+                        titleEl.style.fontSize = fontSize + 'px';
+                      }
+                    })();
+                  </script>
                 </body>
                 </html>
-                """.formatted(safeImage, buildTitleHtml(article.getTitle(), article.getKeyPhrase()));
+                """.formatted(safeImage, safeImage, buildTitleHtml(article.getTitle(), article.getKeyPhrase()));
     }
 
     private String buildLightStoryHtml(ArticleInfo article) {
@@ -388,9 +407,7 @@ public class ImageService {
                     font-family: 'League Spartan', sans-serif;
                     font-weight: 700; font-size: 96px; line-height: 0.95;
                     color: #111111;
-                    display: -webkit-box;
-                    -webkit-line-clamp: 5; -webkit-box-orient: vertical;
-                    overflow: hidden;
+                    word-break: break-word;
                   }
                   .hl {
                     background: #FFD700; color: #111111;
@@ -440,15 +457,34 @@ public class ImageService {
                     <div class="logo">
                       <span class="logo-the">the</span><span class="logo-vilnius">VILNIUS</span>
                     </div>
-                    <div class="title">%s</div>
+                    <div class="title" id="storyTitle">%s</div>
                   </div>
                   <div class="bottom"></div>
                   <div class="cta">
                     <div class="cta-button">Ссылка в шапке профиля <span class="cta-arrow">↑</span></div>
                   </div>
+                  <script>
+                    (function() {
+                      var titleEl = document.getElementById('storyTitle');
+                      var topEl = titleEl.parentElement;
+                      var logoEl = topEl.querySelector('.logo');
+                      var cs = getComputedStyle(topEl);
+                      var available = topEl.clientHeight
+                        - parseFloat(cs.paddingTop)
+                        - parseFloat(cs.paddingBottom)
+                        - logoEl.offsetHeight
+                        - parseFloat(getComputedStyle(logoEl).marginBottom);
+                      var fontSize = 96;
+                      titleEl.style.fontSize = fontSize + 'px';
+                      while (titleEl.scrollHeight > available && fontSize > 44) {
+                        fontSize -= 2;
+                        titleEl.style.fontSize = fontSize + 'px';
+                      }
+                    })();
+                  </script>
                 </body>
                 </html>
-                """.formatted(safeImage, buildTitleHtml(article.getTitle(), article.getKeyPhrase()));
+                """.formatted(safeImage, safeImage, buildTitleHtml(article.getTitle(), article.getKeyPhrase()));
     }
 
     private String buildLightHtml(ArticleInfo article) {

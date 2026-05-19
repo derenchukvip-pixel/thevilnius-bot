@@ -98,8 +98,11 @@ public class PostScheduler {
                     newArticles.size(), allArticles.size(), article.getLink());
 
             try {
+                // Theme: 3 LIGHT → 3 DARK → 3 LIGHT … derived from persistent post count
+                boolean isDark = (historyService.getPostedCount() % 6) >= 3;
+
                 // 1. Generate BOTH images in ONE Chromium instance (saves ~250 MB RAM)
-                imageService.generateBothImages(article);
+                imageService.generateBothImages(article, isDark);
 
                 // 2. Generate caption
                 log.info("Generating caption for: {}", article.getTitle());

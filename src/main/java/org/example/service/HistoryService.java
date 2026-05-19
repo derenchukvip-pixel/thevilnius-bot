@@ -64,6 +64,11 @@ public class HistoryService {
         return slug != null && posted.contains(slug);
     }
 
+    /** Total number of articles posted so far — used to determine LIGHT/DARK theme rotation. */
+    public int getPostedCount() {
+        return posted.size();
+    }
+
     public void markAsPosted(String slug) {
         if (slug == null || slug.isBlank()) return;
         posted.add(slug);
@@ -187,4 +192,5 @@ public class HistoryService {
         }
     }
 }
+
 
