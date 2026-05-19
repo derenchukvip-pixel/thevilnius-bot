@@ -98,16 +98,29 @@ public class PostScheduler {
                     newArticles.size(), allArticles.size(), article.getLink());
 
             try {
-                imageService.generateImage(article);
-                imageService.generateStoryImage(article);
+                // 1. Generate BOTH images in ONE Chromium instance (saves ~250 MB RAM)
+                imageService.generateBothImages(article);
+
+                // 2. Generate caption
                 log.info("Generating caption for: {}", article.getTitle());
                 String caption = captionService.formatCaption(article.getContent());
-                log.info("Caption ready ({} chars), posting to Instagram...", caption.length());
-                instagramService.postImage(caption);
+                log.info("Caption ready ({} chars), posting feed to Instagram...", caption.length());
 
-                // Mark as posted BEFORE anything else so a crash won't cause a double-post
+                // 3. Publish feed post
+                instagramService.postFeed(caption);
+
+                // 4. Mark as posted IMMEDIATELY after feed — even if story fails, no duplicate on next run
                 historyService.markAsPosted(article.getSlug());
-                log.info("Done: {}", article.getLink());
+                log.info("Done (feed): {}", article.getLink());
+
+                // 5. Publish story (best-effort, non-fatal)
+                try {
+                    instagramService.postStoryOnly();
+                    log.info("Done (story): {}", article.getLink());
+                } catch (Exception e) {
+                    log.warn("Story failed (non-fatal, feed was posted): {}", e.getMessage());
+                }
+
             } catch (Exception e) {
                 log.error("Failed to post article '{}' — skipping", article.getLink(), e);
             }

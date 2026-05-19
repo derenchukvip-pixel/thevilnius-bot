@@ -33,7 +33,11 @@ public class ImageService {
 
     private final CaptionService captionService;
 
-    public Path generateImage(ArticleInfo article) throws Exception {
+    /**
+     * Generates BOTH feed (1080×1350) and story (1080×1920) images using a SINGLE
+     * Chromium instance to keep peak memory within Render's 512 MB free-tier limit.
+     */
+    public void generateBothImages(ArticleInfo article) throws Exception {
         Path storageDir = Paths.get(STORAGE_DIR);
         Files.createDirectories(storageDir);
 
@@ -43,40 +47,55 @@ public class ImageService {
         lastTheme = theme;
         log.info("Using {} theme", theme);
 
-        String html = theme == Theme.DARK ? buildDarkHtml(article) : buildLightHtml(article);
+        String feedHtml  = theme == Theme.DARK ? buildDarkHtml(article)      : buildLightHtml(article);
+        String storyHtml = theme == Theme.DARK ? buildDarkStoryHtml(article)  : buildLightStoryHtml(article);
 
-        Path outputPath = storageDir.resolve(OUTPUT_FILENAME);
+        Path feedPath    = storageDir.resolve(OUTPUT_FILENAME);
         Path previewPath = storageDir.resolve("grid_preview.png");
+        Path storyPath   = storageDir.resolve(STORY_FILENAME);
 
-        // Force fresh generation: delete any cached output before re-rendering
-        Files.deleteIfExists(outputPath);
+        Files.deleteIfExists(feedPath);
         Files.deleteIfExists(previewPath);
+        Files.deleteIfExists(storyPath);
 
+        // One Playwright / one Chromium for both renders — ~250 MB instead of ~500 MB
         try (Playwright playwright = Playwright.create()) {
             try (Browser browser = playwright.chromium().launch()) {
-                BrowserContext ctx = browser.newContext(
-                        new Browser.NewContextOptions().setViewportSize(1080, 1350));
-                Page page = ctx.newPage();
-                page.setContent(html);
-                page.waitForLoadState(LoadState.NETWORKIDLE,
-                        new Page.WaitForLoadStateOptions().setTimeout(10_000));
-                page.screenshot(new Page.ScreenshotOptions()
-                        .setPath(outputPath)
-                        .setType(ScreenshotType.PNG));
 
-                // 1:1 grid-crop preview: Instagram profile grid shows the centered
-                // 1080×1080 region of the 1080×1350 post (Y=135 .. Y=1215).
-                page.screenshot(new Page.ScreenshotOptions()
-                        .setPath(previewPath)
-                        .setClip(0, 135, 1080, 1080)
+                // ── Feed 1080×1350 ──────────────────────────────────────────────
+                BrowserContext feedCtx = browser.newContext(
+                        new Browser.NewContextOptions().setViewportSize(1080, 1350));
+                Page feedPage = feedCtx.newPage();
+                feedPage.setContent(feedHtml);
+                feedPage.waitForLoadState(LoadState.NETWORKIDLE,
+                        new Page.WaitForLoadStateOptions().setTimeout(10_000));
+                feedPage.screenshot(new Page.ScreenshotOptions()
+                        .setPath(feedPath).setType(ScreenshotType.PNG));
+                feedPage.screenshot(new Page.ScreenshotOptions()
+                        .setPath(previewPath).setClip(0, 135, 1080, 1080)
                         .setType(ScreenshotType.PNG));
+                feedCtx.close();
+                log.info("Feed image saved: {} ({})", feedPath.toAbsolutePath(), theme);
+
+                // ── Story 1080×1920 ─────────────────────────────────────────────
+                BrowserContext storyCtx = browser.newContext(
+                        new Browser.NewContextOptions().setViewportSize(1080, 1920));
+                Page storyPage = storyCtx.newPage();
+                storyPage.setContent(storyHtml);
+                storyPage.waitForLoadState(LoadState.NETWORKIDLE,
+                        new Page.WaitForLoadStateOptions().setTimeout(10_000));
+                storyPage.screenshot(new Page.ScreenshotOptions()
+                        .setPath(storyPath).setType(ScreenshotType.PNG));
+                storyCtx.close();
+                log.info("Story image saved: {} ({})", storyPath.toAbsolutePath(), theme);
             }
         }
+    }
 
-        log.info("Image saved: {} ({})", outputPath.toAbsolutePath(), theme);
-        log.info("Grid preview saved: {} (1080x1080 crop, Y=135..Y=1215; logo top at Y=200 is inside the crop)",
-                previewPath.toAbsolutePath());
-        return outputPath;
+    /** @deprecated Use {@link #generateBothImages(ArticleInfo)} instead. */
+    public Path generateImage(ArticleInfo article) throws Exception {
+        generateBothImages(article);
+        return Paths.get(STORAGE_DIR, OUTPUT_FILENAME);
     }
 
     // Counter cycles 0–5: 0,1,2 → LIGHT; 3,4,5 → DARK
@@ -92,35 +111,6 @@ public class ImageService {
         return theme;
     }
 
-    public Path generateStoryImage(ArticleInfo article) throws Exception {
-        Path storageDir = Paths.get(STORAGE_DIR);
-        Files.createDirectories(storageDir);
-
-        ensureKeyPhrase(article);
-
-        String html = lastTheme == Theme.DARK
-                ? buildDarkStoryHtml(article)
-                : buildLightStoryHtml(article);
-
-        Path outputPath = storageDir.resolve(STORY_FILENAME);
-
-        try (Playwright playwright = Playwright.create()) {
-            try (Browser browser = playwright.chromium().launch()) {
-                BrowserContext ctx = browser.newContext(
-                        new Browser.NewContextOptions().setViewportSize(1080, 1920));
-                Page page = ctx.newPage();
-                page.setContent(html);
-                page.waitForLoadState(LoadState.NETWORKIDLE,
-                        new Page.WaitForLoadStateOptions().setTimeout(10_000));
-                page.screenshot(new Page.ScreenshotOptions()
-                        .setPath(outputPath)
-                        .setType(ScreenshotType.PNG));
-            }
-        }
-
-        log.info("Story image saved: {} ({})", outputPath.toAbsolutePath(), lastTheme);
-        return outputPath;
-    }
 
     // Computes the key phrase once per article (LLM call) and stores it on the model.
     private void ensureKeyPhrase(ArticleInfo article) {
