@@ -41,26 +41,42 @@ public class CaptionService {
             """;
 
     private static final String KEY_PHRASE_SYSTEM = """
-            Ты анализируешь русскоязычные заголовки новостей и выделяешь САМУЮ важную, шокирующую
-            или интригующую часть, которую нужно подсветить жёлтым маркером в обложке.
+            Ты анализируешь русскоязычные заголовки новостей и выделяешь САМУЮ шокирующую,
+            сенсационную или неожиданную часть — то, от чего читатель остановится при скролле.
 
-            Правила:
-            — Верни ТОЛЬКО подстроку из заголовка — без кавычек, без пояснений, без префиксов
-            — Подстрока должна точно (буква в букву, регистр и пунктуация) встречаться в заголовке
-            — От 1 до 4 идущих подряд слов, без обрывов
-            — Выбирай конкретику (имя, цифру, событие, факт), а не служебные слова
-              ("в Вильнюсе", "сегодня", "стало известно")
-            — Если не уверен — выбери последние 2–3 содержательных слова заголовка
+            ГЛАВНОЕ ПРАВИЛО: выбирай СУЩЕСТВО события — конкретный предмет, явление, лицо,
+            которые делают новость сенсационной. НЕ выбирай место ("в Вильнюсе", "на территории")
+            и не выбирай действие ("обсуждает", "рассматривает"), если можно выделить ЧТО именно.
+
+            Иерархия выбора (от лучшего к худшему):
+            1. Оружие, угроза, катастрофа, смерть → ВСЕГДА приоритет ("ядерное оружие", "взрыв бомбы")
+            2. Конкретное имя известной персоны или организации
+            3. Крупная сумма денег или цифра
+            4. Неожиданное действие или событие
+            5. Прилагательное + существо если вместе дают удар ("массовый арест")
+
+            Технические правила:
+            — Верни ТОЛЬКО подстроку из заголовка — без кавычек, без пояснений
+            — Подстрока должна точно (буква в букву, включая регистр) встречаться в заголовке
+            — От 1 до 4 идущих подряд слов, без обрывов на середине
+            — Никогда не выбирай: "в Вильнюсе", "сегодня", "стало известно", "на своей территории",
+              "обсуждает", "рассматривает" и другие локативы/глаголы без существа
 
             Примеры:
+            Заголовок: Литва обсуждает размещение ядерного оружия на своей территории
+            Ответ: ядерного оружия
+
             Заголовок: Волны краж в Вильнюсе: угнан BMW
             Ответ: угнан BMW
 
-            Заголовок: Цены на жильё снова выросли
-            Ответ: снова выросли
+            Заголовок: Мэр Вильнюса потратил 2 млн евро на ремонт дорог
+            Ответ: 2 млн евро
 
-            Заголовок: Мэр объявил о массовом ремонте дорог
-            Ответ: массовом ремонте дорог
+            Заголовок: В Литве арестован лидер преступной группировки
+            Ответ: лидер преступной группировки
+
+            Заголовок: Цены на жильё выросли на 30%
+            Ответ: на 30%
             """;
 
     @Value("${gemini.api-key:}")
@@ -111,18 +127,42 @@ public class CaptionService {
             return null;
         }
         try {
-            String raw    = callGemini(KEY_PHRASE_SYSTEM, title, 64).strip();
-            String phrase = raw.replaceAll("^[\"'«»\\s]+", "").replaceAll("[\"'«»\\s]+$", "");
-            if (phrase.isBlank() || !title.contains(phrase)) {
-                log.warn("Key phrase '{}' not a substring of title '{}' — using fallback", phrase, title);
+            String raw     = callGemini(KEY_PHRASE_SYSTEM, title, 64).strip();
+            String phrase  = cleanPhrase(raw);
+            String matched = matchInTitle(title, phrase);
+            if (matched == null) {
+                log.warn("Key phrase '{}' not found in title '{}' — using fallback", phrase, title);
                 return null;
             }
-            log.info("Key phrase: '{}'", phrase);
-            return phrase;
+            log.info("Key phrase: '{}'", matched);
+            return matched;
         } catch (Exception e) {
             log.error("Key phrase Gemini call failed — falling back to last words", e);
             return null;
         }
+    }
+
+    /** Strips surrounding quotes, guillemets and stray punctuation/whitespace from the LLM reply. */
+    private static String cleanPhrase(String raw) {
+        if (raw == null) return "";
+        return raw.replaceAll("^[\"'«»“”\\s.,:;—–-]+", "")
+                  .replaceAll("[\"'«»“”\\s.,:;—–-]+$", "")
+                  .strip();
+    }
+
+    /**
+     * Locates {@code phrase} inside {@code title} and returns the substring exactly as it
+     * appears in the title (preserving the title's original casing). Falls back to a
+     * case-insensitive search so a capitalization difference from the LLM doesn't break the
+     * highlight. Returns {@code null} when there is no match.
+     */
+    private static String matchInTitle(String title, String phrase) {
+        if (phrase == null || phrase.isBlank()) return null;
+        int idx = title.indexOf(phrase);
+        if (idx >= 0) return title.substring(idx, idx + phrase.length());
+        idx = title.toLowerCase().indexOf(phrase.toLowerCase());
+        if (idx >= 0) return title.substring(idx, idx + phrase.length());
+        return null;
     }
 
     /**

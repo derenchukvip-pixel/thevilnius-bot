@@ -133,14 +133,27 @@ public class ImageService {
                         + safeTitle.substring(idx + safePhrase.length());
             }
         }
-        String[] words = safeTitle.split(" ");
+        // Fallback (no LLM phrase): highlight a trailing window, but never lead with a
+        // preposition/locative so we don't end up emphasising things like "на своей территории".
+        String[] words = safeTitle.trim().split("\\s+");
         if (words.length <= 3) {
             return "<span class=\"hl\">" + safeTitle + "</span>";
         }
-        String normal = String.join(" ", Arrays.copyOf(words, words.length - 3));
-        String highlighted = String.join(" ", Arrays.copyOfRange(words, words.length - 3, words.length));
-        return normal + " <span class=\"hl\">" + highlighted + "</span>";
+        int start = words.length - 3;
+        while (start < words.length - 1 && STOPWORDS.contains(words[start].toLowerCase())) {
+            start++;
+        }
+        String normal = String.join(" ", Arrays.copyOf(words, start));
+        String highlighted = String.join(" ", Arrays.copyOfRange(words, start, words.length));
+        return (normal.isEmpty() ? "" : normal + " ")
+                + "<span class=\"hl\">" + highlighted + "</span>";
     }
+
+    // Russian prepositions / pronoun-locatives we never want to lead a highlight with.
+    private static final java.util.Set<String> STOPWORDS = java.util.Set.of(
+            "на", "в", "во", "с", "со", "по", "за", "от", "до", "из", "у", "о", "об", "обо",
+            "для", "при", "под", "над", "к", "ко", "и", "а", "но", "же", "бы", "ли",
+            "своей", "свою", "своих", "своего", "этой", "этого", "эту", "его", "их");
 
     private static String escapeHtml(String s) {
         return s == null ? "" : s
@@ -358,7 +371,7 @@ public class ImageService {
                   </script>
                 </body>
                 </html>
-                """.formatted(safeImage, safeImage, buildTitleHtml(article.getTitle(), article.getKeyPhrase()));
+                """.formatted(safeImage, buildTitleHtml(article.getTitle(), article.getKeyPhrase()));
     }
 
     private String buildLightStoryHtml(ArticleInfo article) {
@@ -484,7 +497,7 @@ public class ImageService {
                   </script>
                 </body>
                 </html>
-                """.formatted(safeImage, safeImage, buildTitleHtml(article.getTitle(), article.getKeyPhrase()));
+                """.formatted(safeImage, buildTitleHtml(article.getTitle(), article.getKeyPhrase()));
     }
 
     private String buildLightHtml(ArticleInfo article) {

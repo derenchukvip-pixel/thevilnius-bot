@@ -41,14 +41,7 @@ public class InstagramService {
         awaitContainerReady(creationId, 20); // 20 attempts × 3s = 60s max for feed
         publishMedia(creationId);
         log.info("Published to feed successfully");
-
-        // Story upload with dedicated 9:16 image — failure is non-fatal
-        try {
-            String storyImageUrl = publicUrl.stripTrailing() + "/images/" + ImageService.STORY_FILENAME;
-            postStory(storyImageUrl);
-        } catch (Exception e) {
-            log.error("Story upload failed (non-fatal): {}", e.getMessage());
-        }
+        // Story is published separately by PostScheduler.doRun() via postStoryOnly()
     }
 
     public void postStoryOnly() throws Exception {
