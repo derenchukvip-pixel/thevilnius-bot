@@ -35,8 +35,7 @@ public class ScrapeTestController {
     public String forcePost() throws Exception {
         ArticleInfo article = scraperService.scrapeLatestArticle();
         if (article.getLink() == null) return "No article found";
-        imageService.generateImage(article);
-        imageService.generateStoryImage(article);
+        imageService.generateBothImages(article, false);
         String caption = captionService.formatCaption(article.getContent());
         instagramService.postImage(caption);
         return "Force-posted: " + article.getTitle();
@@ -47,8 +46,7 @@ public class ScrapeTestController {
     public String forceStory() throws Exception {
         ArticleInfo article = scraperService.scrapeLatestArticle();
         if (article.getLink() == null) return "No article found";
-        imageService.generateImage(article);
-        imageService.generateStoryImage(article);
+        imageService.generateBothImages(article, false);
         instagramService.postStoryOnly();
         return "Story posted: " + article.getTitle();
     }
