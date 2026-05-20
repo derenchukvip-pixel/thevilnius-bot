@@ -26,7 +26,7 @@ public class ScrapeTestController {
     @GetMapping("/test/generate")
     public String testGenerate() throws Exception {
         ArticleInfo article = scraperService.scrapeLatestArticle();
-        imageService.generateImage(article);
+        imageService.generateBothImages(article, false);
         return "Generated: " + article.getTitle();
     }
 

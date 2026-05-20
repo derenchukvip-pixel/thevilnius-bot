@@ -9,8 +9,6 @@ import org.example.service.HistoryService;
 import org.example.service.ImageService;
 import org.example.service.InstagramService;
 import org.example.service.ScraperService;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -96,7 +94,7 @@ public class PostScheduler {
                 log.info("Caption ready ({} chars), posting feed to Instagram...", caption.length());
 
                 // 3. Publish feed post
-                instagramService.postFeed(caption);
+                instagramService.postImage(caption);
 
                 // 4. Mark as posted IMMEDIATELY after feed — even if story fails, no duplicate on next run
                 historyService.markAsPosted(article.getSlug());
