@@ -45,20 +45,6 @@ public class PostScheduler {
         }
     }
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void runOnStartup() {
-        log.info("Application ready — running startup publication check");
-        Thread thread = new Thread(() -> {
-            try {
-                run();
-            } catch (Exception e) {
-                log.error("Startup publication check failed", e);
-            }
-        }, "startup-publisher");
-        thread.setDaemon(false);
-        thread.start();
-    }
-
     @Scheduled(cron = "0 0/30 * * * *")
     public void run() {
         if (!runLock.tryLock()) {
